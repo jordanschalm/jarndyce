@@ -2,8 +2,13 @@
 
 ## Installation
 
-git clone 
+Make sure you have Node and NPM installed (http://nodejs.org)
+Clone this repository into ./jarndyce:
+git clone https://github.com/jordanschalm/jarndyce.git jarndyce
+Resolve dependencies with npm:
+cd jarndyce
 npm install
+Run vanilla Jarndyce:
 node jarndyce.js
 
 ## Introduction
