@@ -3,12 +3,19 @@
 ## Installation
 
 Make sure you have Node and NPM installed (http://nodejs.org)
+
 Clone this repository into ./jarndyce:
+
 git clone https://github.com/jordanschalm/jarndyce.git jarndyce
+
 Resolve dependencies with npm:
+
 cd jarndyce
+
 npm install
+
 Run vanilla Jarndyce:
+
 node jarndyce.js
 
 ## Introduction
@@ -39,12 +46,17 @@ The blog.jade template includes the necessary code to perform client-side syntax
 Blog post files can be placed anywhere within the ./blog directory and so can image files, so long as they have the proper image suffix (that is how Express knows to treat them differently) and so long as they are properly linked to within a blog post file. For example, consider the following directory structure:
 
 blog ———————— some_blog_post.html
+
          `——— an_image.jpg
+         
 				 `——— some_directory ———————— another_image.jpg
 
 Within some_blog_post.html, we would access an_image:
+
 <img src=“/blog/an_image.jpg”>
+
 and another_image.jpg:
+
 <img src=“/blog/some_directory/another_image.jpg”>
 
 If you want to, you can have all of blog post HTML files and all of your blog post image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in it’s own sub-directory of ./blog
@@ -53,12 +65,17 @@ If you want to, you can have all of blog post HTML files and all of your blog po
 Metadata sections are in JSON format and must be at the beginning of the file. Metadata sections do not support nested {…} sections but do support array values. Metadata keys are not case-sensitive and are accessible as a post object key in lowercase. An example metadata section looks like the following:
 
 { “Title” : “An Intimate Look At Basket Weaving”,
+
   “date” : “June 2, 2015”,
+
   “catEGOries” : [“Basket Weaving”, “Investigative Journalism”]
 
 This translates to:
+
 post.title = “An Intimate Look At Basket Weaving”;
+
 post.date = “June 2, 2015”;
+
 post.categories = [“Basket Weaving”, “Investigative Journalism”];
 
 ## Templating
@@ -67,7 +84,6 @@ Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very b
 ## Plans For Future Versions
 
 Jarndyce is currently functional but feature-poor. Some features I plan to add include:
-
 * A standard stylesheet for distributions of Jarndyce that includes a footer and looks acceptable
 * Support for some sort of post categorization system, category links below each post, and viewing lists of posts by category.
 
