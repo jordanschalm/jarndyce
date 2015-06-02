@@ -50,7 +50,7 @@ If you want to, you can have all of blog post HTML files and all of your blog po
 ## Metadata
 Metadata sections are in JSON format and must be at the beginning of the file. Metadata sections do not support nested {…} sections but do support array values. Metadata keys are not case-sensitive and are accessible as a post object key in lowercase. An example metadata section looks like the following:
 
-{ “Title” : “An Intimate Look At Basket Weaving”, “date” : “June 2, 2015”, “catEGOries” : [“Basket Weaving”, “Investigative Journalism”]
+{ “Title” : “An Investigation Into The Life Of Basket Weavers”, “date” : “June 2, 2015”, “catEGOries” : [“Basket Weaving”, “Investigative Journalism”]
 
 This translates to:
 
