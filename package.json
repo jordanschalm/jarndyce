@@ -1,0 +1,30 @@
+{
+  "name": "Jarndyce",
+  "version": "1.0.0",
+  "description" : "Light-weight blogging software & web server",
+  "homepage": "http://github.com/jordanschalm/jarndyce/",
+	"licence" : "GPL",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jordanschalm/jarndyce.git"
+  },
+	"author" : {
+		"name" : "Jordan Schalm",
+		"url" : "http://www.jordanschalm.com"
+	},
+	"engine" : "node >= 0.12.2",
+  "dependencies": {
+    "express": "^4.12.3",
+    "jade": "^1.10.0",
+    "mime": "~1.2.7",
+    "rss": "^1.1.1"
+  },
+	"rss" : {
+		"title" : "Blog Title",
+		"description" : "Blog Description",
+		"author" : "Blog's Author",
+		"feedURL" : "RSS feed URL",
+		"siteURL" : "RSS site URL",
+		"ttl" : "120"
+	}
+}

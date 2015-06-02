@@ -1,0 +1,24 @@
+doctype html
+html
+	head
+		// Put your css file in resources/site.css
+		link(rel="stylesheet" type="text/css" href="/resources/site.css")
+		// Put your favicon file in /resources/favicon.ico
+		link(rel="icon" type="image/x-icon" href="/resources/favicon.ico")
+		title 
+			=title
+	body
+		h1
+			a(href="/") JARNDYCE SAMPLE SITE
+		ul
+			li
+				a(href="/blog") BLOG
+			li
+				a(href="/about") ABOUT
+			li
+				a(href="/contact") CONTACT
+			li
+				a(href="/rss") RSS
+			h1 
+				=title
+			!=content

@@ -1,0 +1,48 @@
+doctype html
+html(lang="en")
+	head
+		// Put your css file in resources/site.css
+		link(rel="stylesheet" type="text/css" href="/resources/site.css")
+		// The following enables client-side syntax highlighting for code blocks.
+		// You can choose the style of highlighting you would like be changing the href of the following link
+		link(rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.6/styles/default.min.css")
+		script(src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.6/highlight.min.js")
+		script hljs.initHighlightingOnLoad();
+		title
+			if page
+				| Blog
+				= ' | Page ' + page
+			else
+				=posts[0].title
+	body
+		h1
+			a(href="/") JARNDYCE SAMPLE SITE
+		ul				
+			li
+				a(href="/") BLOG
+			li
+				a(href="/about") ABOUT
+			li
+				a(href="/contact") CONTACT
+			li
+				a(href="/rss") RSS
+			if posts.length === 0
+				p It doesn't look like there's anything here right now.
+			else
+				- for(var i = 0; i < posts.length; i++) 
+					article
+						h1
+							a(href=posts[i].url)
+								= posts[i].title
+						h1= posts[i].date
+						!= posts[i].content
+					if i != posts.length - 1
+			if olderBlogLink === true || newerBlogLink === true
+				#blog-nav
+					ul.blog-nav
+						if olderBlogLink != false
+							li(style="float: right")
+								a(href=olderBlogLink) Older &#62;&#62;
+						if newerBlogLink != false
+							li(style="float: left")
+								a(href=newerBlogLink) &#60;&#60; Newer
