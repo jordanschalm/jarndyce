@@ -21,6 +21,10 @@ Run vanilla Jarndyce:
 
 `node jarndyce`
 
+You can specify a port number, otherwise Jarndyce will default to ALT_PORT:
+
+`node jarndyce [port #]`
+
 ## Usage
 To customize your site’s appearance:
 * add a site.css file in /static/resources/
@@ -89,7 +93,7 @@ Currently Jarndyce will cache ALL detected blog posts and ALL detected static pa
 ### 1.0.1 
 Bug Fixes - June 3, 2015
 
-* Made filesystem operations after initialisation thread-friendly
+* Made filesystem operations after initialization thread-friendly
 * Added licence header to jarndyce.js
 * Added ability to specify port as a commandline argument (node jarndyce <port>)
 * Fixed an issue where serveBlogImage would cause a request to hang when a filesystem error occurred
