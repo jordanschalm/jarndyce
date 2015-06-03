@@ -1,23 +1,39 @@
+/* Copyright Jordan Schalm 2015
+ *
+ * This program is distributed under the terms of the GNU General Public License.
+ * 
+ * This file is part of Jarndyce.
+ *
+ * Jarndyce is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Jarndyce is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Jarndyce.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 /*************/
 /* CONSTANTS */ 
 /*************/
 
-// Disk paths
+// Paths
 var STATIC_ROOT = './static/';
 var RESOURCE_ROOT = './static/resources/';
-var POST_ROOT = './blog/';
+var BLOG_ROOT = './blog/';
+var BLOG_PAGE_ROOT = './blog/page/';
 var BLOG_TEMPLATE = './templates/blog.jade';
 var STATIC_TEMPLATE = './templates/static.jade';
-// URL paths
-var BLOG_ROOT = '/blog/';
-var BLOG_STATIC_ROOT = '/blog/page/';
 // Regexes
-var STATIC_ROOT_REGEX = /^\.?\/root/;
-var POST_ROOT_REGEX = /^\.?\/posts/;
-var METADATA_REGEX = /\[(\w*?)\s*?:\s*(.*?)\]/g;
 var METADATA_SECTION_REGEX = /\{(.|\n)*?\}/
+var BLOG_IMAGE_REGEX = /\/blog\/(.*\.)(jpg|jpeg|png|tiff|gif|bmp)/i;
 
-var VERBOSE = true;
+var VERBOSE = false;
 var ALT_PORT = 3030;
 var POSTS_PER_PAGE = 5;
 var POSTS_IN_RSS = 25;
@@ -29,7 +45,6 @@ var POSTS_IN_RSS = 25;
 var fs = require('fs');
 var rss = require('rss');
 var http = require('http');
-var path = require('path');
 var mime = require('mime');
 var jade = require('jade');
 var express = require('express');
@@ -38,12 +53,11 @@ var jarndyce = require('./package.json');
 // Create an array that holds all blog posts in order from newest (0) to oldest (n-1).
 var blogCache = [];
 populateBlogCache();
-// Create a dictionary of static pages of the form (path, fileContents)
+// Create a reference for static pages (path, page)
 var staticCache = {};
 var staticCacheSize = populateStaticCache();
 // Set up RSS
-var feed;
-setupRSS();
+var feed = setupRSS();
 var rssXML = feed.xml();
 
 if(blogCache.length === 1)
@@ -61,9 +75,9 @@ app.use(function (request, response, next) {
 	response.header('X-powered-by', 'Jarndyce v' + jarndyce.version);
 	next();
 });
-// Listen on the port assigned by Heroku or ALT_PORT
-var server = http.createServer(app).listen(process.env.PORT || ALT_PORT, function() {
-	console.log('Server running on port: %s', server.address().port);
+// Listen on the port assigned by Heroku or command line argument or ALT_PORT
+var server = http.createServer(app).listen(process.env.PORT || process.argv[2] || ALT_PORT, function() {
+	console.log('Jarndyce v' + jarndyce.version + ' running on port: %s', server.address().port);
 });
 
 if(VERBOSE) {
@@ -110,33 +124,36 @@ function servePage(response, path) {
 		serveData(response, html, "text/html");
 	}
 	else {
-		fs.exists(path, function(exists) {
-			if(exists) {
-				fs.readFile(path, function(err, data) {
-					if(err) {
-						console.log('An error occurred while reading the file with path: ' + path + '. Code: ' + err.code);
-						send404(response);
-					}
-					else {
-						serveData(response, data, mime.lookup(path));
-					}
-				});
+		readFile(path, function(data, err) {
+			if(err) {
+				console.log(err.code);
+				send404(response);
+			}
+			else if(!data) {
+				send404(response);
 			}
 			else {
-				console.log('The file with path ' + path + ' does not exist.');
-				send404(response);
+				serveData(response, data, mime.lookup(path));
 			}
 		});
 	}
 }
 
-/*	Serves an image from a blog
+/*	Serves an image from a blog post
  */
 function serveBlogImage(response, path) {
-	var image = readFile(path);
-	if(image) {
-		serveData(response, image, mime.lookup(path));
-	}
+	readFile(path, function(data, err) {
+		if(err) {
+			console.log(err.code);
+			send404(response);
+		}
+		else if(!data) {
+			send404(response)
+		}
+		else {
+			serveData(response, data, mime.lookup(path));
+		}
+	});
 }
 
 /*	Serves an individual blog post with standard header and footer. The blog
@@ -174,6 +191,7 @@ function serveBlogPost(response, post) {
  *	the (POSTS_PER_PAGE * page) most recent post or the least recent post.
  */
 function serveBlogPage(response, page) {
+	// Check that the requested page is valid
 	if((page - 1) * POSTS_PER_PAGE >= blogCache.length && blogCache.length > 0) {
 		console.log('Requested blog page ' + page + ' is invalid.');
 		send404(response);	// TODO custom 404 message indicating that the page is invalid
@@ -188,10 +206,10 @@ function serveBlogPage(response, page) {
 		var olderBlogLink = false;
 		var newerBlogLink = false;
 		if(page > 1) {
-			newerBlogLink = BLOG_PAGE + String(page - 1);
+			newerBlogLink = BLOG_PAGE_ROOT + String(page - 1);
 		}
 		if(page * POSTS_PER_PAGE < blogCache.length) {
-			olderBlogLink = BLOG_PAGE + String(page + 1);
+			olderBlogLink = BLOG_PAGE_ROOT + String(page + 1);
 		}
 		var jadeOptions = {
 			filename : page, 
@@ -214,35 +232,35 @@ function serveBlogPage(response, page) {
 /* CACHE INITIALIZATION */
 /************************/
 
-/*	Searches the POST_ROOT directory recursively, populates the 
+/*	Searches the BLOG_ROOT directory recursively, populates the 
  *	blog post cache array, and sorts the array from most recent 
  *	[0] to least recent [n-1].
  */
 function populateBlogCache() {
 	var posts = false;
-	posts = readDirectory(POST_ROOT, true);
+	posts = readDirectory(BLOG_ROOT, true);
 	if(posts) {
 		for(var index = 0; index < posts.length; index++) {
 			if(posts[index].match(/.*\.html/)) {
-				var fileContents = String(readFile(posts[index]));
-				//var title = fileContents.match(TITLE_METADATA_REGEX)[1];
-				//var date = fileContents.match(DATE_METADATA_REGEX)[1];
+				var fileContents = String(readFileSync(posts[index]));
 				var post = JSON.parse(fileContents.match(METADATA_SECTION_REGEX)[0]);
-				post.path = path;
-				post.url = BLOG_ROOT + post.title.replace(/ /g, '-');
+				post.path = posts[index];
+				post.url = BLOG_ROOT + post.title;
 				post.content = fileContents.replace(METADATA_SECTION_REGEX, '');
-				//post.content = fileContents.replace(METADATA_SECTION_REGEX, '');
 				if(post.title && post.date) {
 					blogCache.push(post);
 				}
 				else {
-					console.log('A post at path ' + path + ' did not have properly formatted metadata');
+					console.log('A post at path ' + post.path + ' did not have properly formatted metadata');
 				}
 			}
 		}
 		// After all posts have been read, sort from newest to oldest
 		blogCache.sort(function(a,b) {
-			return Date.parse(b.date) - Date.parse(a.date);
+			if(a.timeStamp && b.timeStamp)
+				return Date.parse(b.timeStamp) - Date.parse(a.timeStamp);
+			else
+				return Date.parse(b.date) - Date.parse(a.date);
 		});
 	}
 }
@@ -256,7 +274,7 @@ function populateStaticCache() {
 	var pages = readDirectory(STATIC_ROOT, false);
 	for(var index = 0; index < pages.length; index++) {
 		if(pages[index].match(/.*\.html/)) {
-			var fileContents = String(readFile(pages[index]));
+			var fileContents = String(readFileSync(pages[index]));
 			var page = JSON.parse(fileContents.match(METADATA_SECTION_REGEX)[0]);
 			page.content = fileContents.replace(METADATA_SECTION_REGEX, '');
 			staticCache[pages[index]] = page;
@@ -271,9 +289,10 @@ function populateStaticCache() {
 /********************/
 
 /*	Adds POSTS_IN_RSS blog posts in the cache to the site's RSS feed
+ *	All RSS info is pulled from the package.json file.
  */
 function setupRSS() {
-	feed = new rss({
+	var feed = new rss({
 		title : jarndyce.rss.title,
 		description : jarndyce.rss.description,
 		feed_url : jarndyce.rss.feedURL,
@@ -297,6 +316,9 @@ function setupRSS() {
 			author : blogCache[index].author || jarndyce.rss.author
 		});
 	}
+	if(VERBOSE) 
+		console.log('Added ' + size + ' most recent posts to RSS feed');
+	return feed;
 }
 
 /*	Searchs the directory at the given path and returns the paths
@@ -333,11 +355,12 @@ function readDirectory(path, recursive) {
 }
 
 /*	Reads the file at the specified path, if it exists, and
- *	returns the contents of the file as a string. 
+ *	returns the contents of the file. This function is used
+ *	for initialization when we want things to happen sync.
  *	NOTE: currently just eats any FS errors that may occur
  *	path (String)
  */
-function readFile(path) {
+function readFileSync(path) {
 	if(fs.existsSync(path)) {
 		try {
 			var data = fs.readFileSync(path);
@@ -349,6 +372,34 @@ function readFile(path) {
 	else {
 		console.log('The file at path: ' + path + ' does not exist');
 	}
+}
+
+/*	Reads the file at the specified path, if it exists, and
+ *	returns the contents of the file. This function is used
+ *	after initialization is complete when we want things to
+ *	happen synchronously.
+ *	NOTE: Currently eats FS errors
+ *	path (String)
+ *	callback (function) - Has a single parameter, the data
+ *	that was read from the file, and the error if one was
+ *	thrown.
+ */
+function readFile(path, callback) {
+	fs.exists(path, function(exists) {
+		if(exists) {
+			fs.readFile(path, function(err, data) {
+				if(err) {
+					callback(data, err);
+				}
+				else {
+					callback(data);
+				}
+			});
+		}
+		else {
+			callback(false);
+		}
+	});
 }
 
 /*	Checks whether or not a file in the ./root/ directory is
@@ -376,13 +427,6 @@ function lookupPostByTitle(title) {
 	return false;
 }
 
-/*	Formats a blog post path for a specific date (YYYY/MM/DD/)
- *	year, day, month (String) 
- */
-function dateSlug(year, month, day) {
-	return year + '/' + month + '/' + day + '/';
-}
-
 /***********/
 /* ROUTING */
 /***********/
@@ -391,8 +435,8 @@ app.get('/', function(request, response) {
 	response.redirect('/blog');
 });
 
-app.get(/\/blog\/(.*\.)(jpg|jpeg|png|tiff|gif|bmp)/i, function(request, response) {
-	var path = POST_ROOT + request.params[0] + request.params[1];
+app.get(BLOG_IMAGE_REGEX, function(request, response) {
+	var path = BLOG_ROOT + request.params[0] + request.params[1];
 	serveBlogImage(response, path);
 });
 
@@ -407,7 +451,7 @@ app.get('/blog/page/:page', function(request, response) {
 
 app.get('/blog/:title', function(request, response) {
 	// Replace -'s in the URL with spaces
-	var title = request.params.title.replace(/-/g, ' ');
+	var title = request.params.title;
 	serveBlogPost(response, lookupPostByTitle(title));
 });
 
