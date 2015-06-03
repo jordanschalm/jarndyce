@@ -88,6 +88,17 @@ Currently, ordering posts by date only works to the nearest day since the date m
 
 ## Change Log
 
+### 1.0.1 
+Bug Fixes - June 3, 2015
+
+* Made filesystem operations after initialisation thread-friendly
+* Added licence header to jarndyce.js
+* Added ability to specify port as a commandline argument (node jarndyce <port>)
+* Fixed an issue where serveBlogImage would cause a request to hang when a filesystem error occurred
+* Added support for an optional blog metadata item, timeStamp, which is used for finer-grain chronological sorting whereas the data item is used as a nicely formatted date string
+* Fixed a bug that would generate bad URLs in Older/Newer blog page navigation
+* Changed blog URLs so that spaces are left in instead of beign converted to '-'s. This fixes a bug where blog titles with '-'s had broken URLs.# with '#' will be ignored, and an empty message aborts the commit.
+
 ### 1.0.0
 Initial Release - June 2, 2015
 
