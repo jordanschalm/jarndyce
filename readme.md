@@ -63,7 +63,7 @@ If you want to, you can have all of blog post HTML files and all of your blog po
 ## Metadata
 Metadata sections are in a subset of the JSON format and must be at the beginning of the file. Metadata sections do not support nested {…} sections for simplicity, but do support array values. Metadata keys are not case-sensitive and any keys are converted to lowercase. An example metadata section looks like the following:
 
-{ “Title” : “An Investigation Into The Life Of Basket Weavers”, “date” : “June 2, 2015”, “catEGOries” : [“Basket Weaving”, “Investigative Journalism”]
+{ “Title” : “An Investigation Into The Life Of Basket Weavers”, “date” : “June 2, 2015”, “catEGOries” : [“Basket Weaving”, “Investigative Journalism”] }
 
 This translates to:
 
@@ -83,8 +83,6 @@ Jarndyce is currently functional but feature-poor. Some features I plan to add i
 
 ## Known Issues
 Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization.
-
-Currently, ordering posts by date only works to the nearest day since the date metadata is granular to the nearest day.
 
 ## Change Log
 
