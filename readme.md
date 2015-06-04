@@ -66,7 +66,7 @@ Blog post files can be placed anywhere within the /blog/ directory and so can im
 If you want to, you can have all of blog post HTML files and all of your blog post image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
 
 ## Metadata
-Metadata sections are in a subset of the JSON format and must be at the beginning of the file. Metadata sections do not support nested {…} sections for simplicity, but do support array values. Metadata keys are not case-sensitive and any keys are converted to lowercase. An example metadata section looks like the following:
+Metadata sections are in a subset of the JSON format and must be at the beginning of the file. Metadata sections do not support nested {…} sections for simplicity, but do support array values. Metadata keys are not case-sensitive. An example metadata section looks like the following:
 
 { “Title” : “An Investigation Into The Life Of Basket Weavers”, “date” : “June 2, 2015”, “catEGOries” : [“Basket Weaving”, “Investigative Journalism”] }
 
