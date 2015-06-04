@@ -29,6 +29,7 @@ You can specify a port number, otherwise Jarndyce will default to ALT_PORT:
 To customize your site’s appearance:
 * add a site.css file in /static/resources/
 * alter the provided blog.jade and static.jade templates
+
 If you are using RSS, change the RSS settings portion of the package.json file
 
 To add static pages, simply place the HTML file in the /static/ directory and add a link to it somewhere in the Jade templates to make it easily accessible.
@@ -54,7 +55,7 @@ Blog post files must be placed in the /blog/ directory. During initialization, J
 
 When a blog page or blog post is requested, Jarndyce looks up the necessary post(s) and renders them with a Jade template which can be found at /templates/blog.jade. This template uses the title and date metadata to create a standardized title/date header above each post, so don’t include title or date headers after the metadata section of your blog post file!
 
-Blog bodies must be in HTML format and must have at least the following header metadata: title, date. Data metadata must be parseable be Date.parse() in order for blogs to be correctly ordered.
+Blog bodies must be in HTML format and must have at least the following header metadata: title, date. Data metadata must be parseable be Date.parse() in order for blogs to be correctly ordered. To allow for finer grain ordering, you can specify a timeStamp metadata item. This is a date string parseable by Date.parse() that can be more specific than the date metadata because it is not displayed on blog pages.
 
 ### Syntax Highlighting
 The blog.jade template includes the necessary code to perform client-side syntax highlighting in code blocks using [Highlight.js](https://highlightjs.org “Highlight.js”). A link to the default highlighting stylesheet is included in the head.
@@ -82,11 +83,15 @@ Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very b
 
 ## Plans For Future Versions
 Jarndyce is currently functional but feature-poor. Some features I plan to add include:
+* Standard HTML header/footer support
+* Easy upload from [Ulysses](http://www.ulyssesapp.com "Ulysses"), my text editor of choice
 * A standard stylesheet for distributions of Jarndyce that includes a footer and looks acceptable
-* Support for some sort of post categorization system, category links below each post, and viewing lists of posts by category.
+* Support for some sort of post categorization system, category links below each post, and viewing lists of posts by category
+
 
 ## Known Issues
-Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization.
+* Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization
+* Currently metadata sections cannot contain the '}' character because of the regex used to capture the metadata section
 
 ## Change Log
 
@@ -94,16 +99,15 @@ Currently Jarndyce will cache ALL detected blog posts and ALL detected static pa
 Bug Fixes - June 3, 2015
 
 * Made filesystem operations after initialization thread-friendly
-* Added licence header to jarndyce.js
-* Added ability to specify port as a commandline argument (node jarndyce <port>)
+* Added licence header speal to jarndyce.js
+* Added ability to specify port as a commandline argument (node jarndyce [port #])
 * Fixed an issue where serveBlogImage would cause a request to hang when a filesystem error occurred
 * Added support for an optional blog metadata item, timeStamp, which is used for finer-grain chronological sorting whereas the data item is used as a nicely formatted date string
 * Fixed a bug that would generate bad URLs in Older/Newer blog page navigation
-* Changed blog URLs so that spaces are left in instead of beign converted to '-'s. This fixes a bug where blog titles with '-'s had broken URLs.# with '#' will be ignored, and an empty message aborts the commit.
+* Changed blog URLs so that spaces are left in instead of being converted to '-'s. This fixes a bug where blog titles with '-'s had broken URLs
 
 ### 1.0.0
 Initial Release - June 2, 2015
 
-Features:
 * RSS support
-* support for caching blog/static HTML content & metadata on launch
+* Support for caching blog/static HTML content & metadata on launch
