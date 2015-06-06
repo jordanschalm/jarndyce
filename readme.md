@@ -84,53 +84,7 @@ The categories metadata is also determined when a blog post is first added. Jarn
 If you need to alter any of the metadata for a blog post that has already been added to the archive, you can do so by simply editing the JSON file in the /archive/ directory.
 
 ## Markdown
-Jarndyce uses [Marked](https://github.com/chjj/marked "Marked") for Markdown to HTML conversion. Marked includes a 'smartypants' option which nicely formats double and triple dashes and single and double quotes, however in the version on their repository, dashes and quotes are converted to Unicode characters instead of HTML codes. In my experience, this has rendered the output unreadable in a web browser, so I forked a copy of their code and altered the smartypants bit. You can download my altered version [here](https://github.com/jordanschalm/marked "Marked") or you can simply replace this:
-
-```javascript
-InlineLexer.prototype.smartypants = function(text) {
-  if (!this.options.smartypants) return text;
-  return text
-    // em-dashes
-    .replace(/---/g, '\u2014')
-    // en-dashes
-    .replace(/--/g, '\u2013')
-    // opening singles
-    .replace(/(^|[-\u2014/(\[{"\s])'/g, '$1\u2018')
-    // closing singles & apostrophes
-    .replace(/'/g, '\u2019')
-    // opening doubles
-    .replace(/(^|[-\u2014/(\[{\u2018\s])"/g, '$1\u201c')
-    // closing doubles
-    .replace(/"/g, '\u201d')
-    // ellipses
-    .replace(/\.{3}/g, '\u2026');
-};
-```
-
-with this:
-
-```javascript
-InlineLexer.prototype.smartypants = function(text) {
-  if (!this.options.smartypants) return text;
-  return text
-    // em-dashes
-    .replace(/---/g, '&#8212;')
-    // en-dashes
-    .replace(/--/g, '&#8211;')
-    // opening singles
-    .replace(/(^|[-\u2014/(\[{"\s])'/g, '$1&#8216;')
-    // closing singles & apostrophes
-    .replace(/'/g, '&#8217;')
-    // opening doubles
-    .replace(/(^|[-\u2014/(\[{\u2018\s])"/g, '$1&#8220;')
-    // closing doubles
-    .replace(/"/g, '&#8221;')
-    // ellipses
-    .replace(/\.{3}/g, '&#8230;');
-};
-```
-
-Which is at around line 720 in marked.js. Alternatively, you can disable the smartypants option in Jarndyce by removing the `setOptions` call on marked in the initialization.
+Jarndyce uses [Marked](https://github.com/chjj/marked "Marked") for Markdown to HTML conversion. Marked includes a 'smartypants' option which nicely formats double and triple dashes and single and double quotes, however in the version on their repository, dashes and quotes are converted to Unicode characters instead of HTML codes. If you have any en/em dashes or fancy quote marks, make sure you specify the HTML charset to be UTF-16 otherwise your content will be littered with garbage characters. The default charset for the blog.jade and static.jade templates is UTF-16.
 
 ## Templating
 Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very basic sample templates are included, one for blogs and one for static pages.

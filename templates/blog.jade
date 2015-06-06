@@ -1,6 +1,7 @@
 doctype html
 html(lang="en")
 	head
+		meta(charset="UTF-16")
 		// Put your css file in resources/site.css
 		link(rel="stylesheet" type="text/css" href="/resources/site.css")
 		// The following enables client-side syntax highlighting for code blocks.
@@ -24,7 +25,8 @@ html(lang="en")
 						h1
 							a(href=posts[i].url)
 								= posts[i].title
-						h1= posts[i].date
+						h2
+							= posts[i].date
 						!= posts[i].content
 					if i != posts.length - 1
 			if olderBlogLink === true || newerBlogLink === true
