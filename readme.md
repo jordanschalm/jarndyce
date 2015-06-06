@@ -31,14 +31,14 @@ To customize your site’s appearance:
 
 If you are using RSS or would like to take advantage of Jarndyce’s auto-categorization (see Metadata), change the RSS settings portion of the package.json file.
 
-To add static pages, simply place the Markdown file in the /static/ directory and add a link to it somewhere in the Jade templates to make it easily accessible.
+To add static pages, simply place the Markdown file in the /static/ directory and add a link to it somewhere in the Jade templates, the header or the footer to make it easily accessible.
 
 To add a blog post, simply place the blog post Markdown file in the /blog/ directory and jarndyce will automatically add it to the /blog page of your website.
 
 Once everything looks good, it is easy to deploy to Heroku using this [tutorial](https://devcenter.heroku.com/articles/deploying-nodejs “Heroku Node.js tutorial”).
 
 ## Static Pages
-Static pages are kept in the static folder and are served using the app.get(‘/:slug‘) routing method. During initialization, files found *non-recursively* in the /static/ directory matching *.md will be cached as static pages. These files should contain a standard title header (see Metadata). There are a few sample static pages included as examples.
+Static pages are kept in the static folder and are served using the app.get(‘/:slug‘) routing method. During initialization, Markdown files found *non-recursively* in the /static/ directory will be cached as static pages. These files should contain a standard title header (see Metadata). There are a few sample static pages included as examples.
 
 ## Blog Pages
 The standard home page is the most recent blog page. Blog pages are collections of blog posts arranged by date from most to least recent. The number of blog posts per page can be changed using the POSTS_PER_PAGE symbolic constant (the default is 5). Blog posts can also be accessed individually at www.yourdomain.com/blog/title. Since blog posts are accessed individually by title, if two posts are uploaded with exactly the same title, only one will be individually accessible (they will still both be accessible through page navigation).
@@ -65,7 +65,7 @@ If you want to, you can have all of blog Markdown files and all of your blog ima
 
 ## Metadata
 Jarndyce tries to minimize the amount of metadata required in blog posts. The only metadata you need to explicitly specify in both blog posts and static pages is the title, which is formatted as a standard Markdown title.
-This:
+This at the top of a file:
 
 \# A Blog Post Title
 
