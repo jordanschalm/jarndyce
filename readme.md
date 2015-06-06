@@ -125,3 +125,7 @@ Initial Release - June 2, 2015
 
 * RSS support
 * Support for caching blog/static HTML content & metadata on launch
+
+## License
+Copyright Jordan Schalm 2015 (GPL v3)  
+See LICENSE for more details
