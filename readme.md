@@ -61,7 +61,7 @@ The blog.jade template includes the necessary code to perform client-side syntax
 ### Images
 Blog post files can be placed anywhere within the /blog/ directory and so can image files, so long as they have the proper image suffix (that is how the Express routing rules decide to treat them differently).
 
-If you want to, you can have all of blog Markdown files and all of your blog image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
+If you want to, you can have all of your blog Markdown files and all of your blog image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
 
 ## Metadata
 Jarndyce tries to minimize the amount of metadata required in blog posts. The only metadata you need to explicitly specify in both blog posts and static pages is the title, which is formatted as a standard Markdown title.
@@ -71,7 +71,7 @@ This at the top of a file:
 
 Is equivalent to:
 
-post.title = “A Blog Post Title”
+`post.title = “A Blog Post Title”`
 
 In addition to title, Jarndyce supports date, time-stamp, and categories metadata for blog posts. 
 
@@ -79,7 +79,7 @@ When a new blog post is added, Jarndyce notes the current time and adds that as 
 
 The date metadata item is a nice-looking date string of the form “Month Day, Year”. For example, “January 4, 2015”. The date is parsed from the timeStamp when a blog is added to the archive.
 
-The categories metadata is also determined when a blog post is first added. Jarndyce looks at your blog’s global categories (which are specified in the RSS section of package.json and are available with jarndyce.rss.categories) and determines which of these the current post satisfies. Specifically, Jarndyce determines whether (instances of a category keyword) / (total number of words) > CATEGORY_APPEARANCE_THRESHOLD. If a given global category keyword appears often enough in the current blog post, that keyword is added to the posts categories metadata. The default value of CATEGORY_APPEARANCE_THRESHOLD is 1%. This method of determining category metadata is imprecise, but I chose it because it allows Jarndyce to completely dispose of metadata in the actual blog post files.
+The categories metadata is also determined when a blog post is first added. Jarndyce looks at your blog’s global categories (which are specified in the RSS section of package.json and are available with jarndyce.rss.categories) and determines which of these the current post satisfies. Specifically, Jarndyce determines whether (instances of a category keyword) / (total number of words) > CATEGORY_APPEARANCE_THRESHOLD. If a given global category keyword appears often enough in the current blog post, that keyword is added to the post's categories metadata. The default value of CATEGORY_APPEARANCE_THRESHOLD is 1%. This method of determining category metadata is imprecise, but I chose it because it allows Jarndyce to completely dispose of metadata in the actual blog post files.
 
 If you need to alter any of the metadata for a blog post that has already been added to the archive, you can do so by simply editing the JSON file in the /archive/ directory.
 
@@ -96,7 +96,7 @@ Jarndyce is currently functional but feature-poor. Some features I plan to add i
 
 
 ## Known Issues
-* Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization
+* Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization if there isn't enough memory available.
 
 ## Change Log
 
