@@ -86,7 +86,7 @@ If you need to alter any of the metadata for a blog post that has already been a
 ## Markdown
 Jarndyce uses [Marked](https://github.com/chjj/marked "Marked") for Markdown to HTML conversion. Marked includes a 'smartypants' option which nicely formats double and triple dashes and single and double quotes, however in the version on their repository, dashes and quotes are converted to Unicode characters instead of HTML codes. In my experience, this has rendered the output unreadable in a web browser, so I forked a copy of their code and altered the smartypants bit. You can download my altered version [here](https://github.com/jordanschalm/marked "Marked") or you can simply replace this:
 
-```
+```javascript
 InlineLexer.prototype.smartypants = function(text) {
   if (!this.options.smartypants) return text;
   return text
@@ -109,14 +109,14 @@ InlineLexer.prototype.smartypants = function(text) {
 
 with this:
 
-```
+```javascript
 InlineLexer.prototype.smartypants = function(text) {
   if (!this.options.smartypants) return text;
   return text
-	  // em-dashes
-	  .replace(/---/g, '&#8212;')
+    // em-dashes
+    .replace(/---/g, '&#8212;')
     // en-dashes
-		.replace(/--/g, '&#8211;')
+    .replace(/--/g, '&#8211;')
     // opening singles
     .replace(/(^|[-\u2014/(\[{"\s])'/g, '$1&#8216;')
     // closing singles & apostrophes
