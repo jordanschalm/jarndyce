@@ -61,7 +61,7 @@ The blog.jade template includes the necessary code to perform client-side syntax
 ### Images
 Blog post files can be placed anywhere within the /blog/ directory and so can image files, so long as they have the proper image suffix (that is how the Express routing rules decide to treat them differently).
 
-If you want to, you can have all of blog post HTML files and all of your blog post image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
+If you want to, you can have all of blog Markdown files and all of your blog image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
 
 ## Metadata
 Jarndyce tries to minimize the amount of metadata required in blog posts. The only metadata you need to explicitly specify in both blog posts and static pages is the title, which is formatted as a standard Markdown title.
@@ -82,6 +82,55 @@ The date metadata item is a nice-looking date string of the form “Month Day, Y
 The categories metadata is also determined when a blog post is first added. Jarndyce looks at your blog’s global categories (which are specified in the RSS section of package.json and are available with jarndyce.rss.categories) and determines which of these the current post satisfies. Specifically, Jarndyce determines whether (instances of a category keyword) / (total number of words) > CATEGORY_APPEARANCE_THRESHOLD. If a given global category keyword appears often enough in the current blog post, that keyword is added to the posts categories metadata. The default value of CATEGORY_APPEARANCE_THRESHOLD is 1%. This method of determining category metadata is imprecise, but I chose it because it allows Jarndyce to completely dispose of metadata in the actual blog post files.
 
 If you need to alter any of the metadata for a blog post that has already been added to the archive, you can do so by simply editing the JSON file in the /archive/ directory.
+
+## Markdown
+Jarndyce uses [Marked](https://github.com/chjj/marked "Marked") for Markdown to HTML conversion. Marked includes a 'smartypants' option which nicely formats double and triple dashes and single and double quotes, however in the version on their repository, dashes and quotes are converted to Unicode characters instead of HTML codes. In my experience, this has rendered the output unreadable in a web browser, so I forked a copy of their code and altered the smartypants bit. You can download my altered version [here](https://github.com/jordanschalm/marked "Marked") or you can simply replace this:
+
+```
+InlineLexer.prototype.smartypants = function(text) {
+  if (!this.options.smartypants) return text;
+  return text
+    // em-dashes
+    .replace(/---/g, '\u2014')
+    // en-dashes
+    .replace(/--/g, '\u2013')
+    // opening singles
+    .replace(/(^|[-\u2014/(\[{"\s])'/g, '$1\u2018')
+    // closing singles & apostrophes
+    .replace(/'/g, '\u2019')
+    // opening doubles
+    .replace(/(^|[-\u2014/(\[{\u2018\s])"/g, '$1\u201c')
+    // closing doubles
+    .replace(/"/g, '\u201d')
+    // ellipses
+    .replace(/\.{3}/g, '\u2026');
+};
+```
+
+with this:
+
+```
+InlineLexer.prototype.smartypants = function(text) {
+  if (!this.options.smartypants) return text;
+  return text
+	  // em-dashes
+	  .replace(/---/g, '&#8212;')
+    // en-dashes
+		.replace(/--/g, '&#8211;')
+    // opening singles
+    .replace(/(^|[-\u2014/(\[{"\s])'/g, '$1&#8216;')
+    // closing singles & apostrophes
+    .replace(/'/g, '&#8217;')
+    // opening doubles
+    .replace(/(^|[-\u2014/(\[{\u2018\s])"/g, '$1&#8220;')
+    // closing doubles
+    .replace(/"/g, '&#8221;')
+    // ellipses
+    .replace(/\.{3}/g, '&#8230;');
+};
+```
+
+Which is at around line 720 in marked.js. Alternatively, you can disable the smartypants option in Jarndyce by removing the `setOptions` call on marked in the initialization.
 
 ## Templating
 Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very basic sample templates are included, one for blogs and one for static pages.
