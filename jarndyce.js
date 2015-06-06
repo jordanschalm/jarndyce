@@ -22,21 +22,25 @@
 /* CONSTANTS */ 
 /*************/
 
-// Paths
 var STATIC_ROOT = './static/';
 var RESOURCE_ROOT = './static/resources/';
-var BLOG_ROOT = './blog/';
-var BLOG_PAGE_ROOT = './blog/page/';
+var BLOG_PATH_ROOT = './blog/';
+var BLOG_URL_ROOT = '/blog/';
+var ARCHIVE_ROOT = './archive/';
+var BLOG_PAGE_ROOT = '/blog/page/';
 var BLOG_TEMPLATE = './templates/blog.jade';
 var STATIC_TEMPLATE = './templates/static.jade';
-// Regexes
-var METADATA_SECTION_REGEX = /\{(.|\n)*?\}/
+var HEADER_TEMPLATE = './templates/header.html';
+var FOOTER_TEMPLATE = './templates/footer.html';
+
+var TITLE_REGEX = /#.*?(\b.*?)\n/;
 var BLOG_IMAGE_REGEX = /\/blog\/(.*\.)(jpg|jpeg|png|tiff|gif|bmp)/i;
 
 var VERBOSE = false;
 var ALT_PORT = 3030;
 var POSTS_PER_PAGE = 5;
 var POSTS_IN_RSS = 25;
+var CATEGORY_APPEARANCE_THRESHOLD = 1 / 100; // 0.75 per 100 words
 
 /******************/
 /* INITIALIZATION */
@@ -47,9 +51,15 @@ var rss = require('rss');
 var http = require('http');
 var mime = require('mime');
 var jade = require('jade');
+var marked = require('marked').setOptions({
+	smartypants: true
+});
 var express = require('express');
 var jarndyce = require('./package.json');
 
+// Find and cache templates
+var headerTemplate, footerTemplate, blogTemplate, staticTemplate;
+cacheTemplates();
 // Create an array that holds all blog posts in order from newest (0) to oldest (n-1).
 var blogCache = [];
 populateBlogCache();
@@ -115,10 +125,12 @@ function servePage(response, path) {
 			pretty : true,
 			cache : true 
 		};	
-		var renderBlog = jade.compileFile(STATIC_TEMPLATE, jadeOptions);
+		var renderBlog = jade.compile(staticTemplate, jadeOptions);
 		var jadeLocals = { 
 			title : page.title ,
-			content : page.content
+			content : page.content,
+			header : headerTemplate,
+			footer : footerTemplate
 		};	
 		var html = renderBlog(jadeLocals);
 		serveData(response, html, "text/html");
@@ -140,6 +152,7 @@ function servePage(response, path) {
 }
 
 /*	Serves an image from a blog post
+ *	path (String)
  */
 function serveBlogImage(response, path) {
 	readFile(path, function(data, err) {
@@ -173,12 +186,14 @@ function serveBlogPost(response, post) {
 			pretty : true,
 			cache : true 
 		};	
-		var renderBlog = jade.compileFile(BLOG_TEMPLATE, jadeOptions);
+		var renderBlog = jade.compile(blogTemplate, jadeOptions);
 		var jadeLocals = { 
 			page : false, 
 			olderBlogLink : false,
 			newerBlogLink : false, 
-			posts : posts 
+			posts : posts,
+			header : headerTemplate,
+			footer : footerTemplate
 		};	
 		var html = renderBlog(jadeLocals);
 		serveData(response, html, "text/html");
@@ -216,12 +231,14 @@ function serveBlogPage(response, page) {
 			pretty : true,
 			cache : true 
 		};
-		var renderBlog = jade.compileFile(BLOG_TEMPLATE, jadeOptions);
+		var renderBlog = jade.compile(blogTemplate, jadeOptions);
 		var jadeLocals = { 
 			page : page, 
 			olderBlogLink : olderBlogLink,
 		  newerBlogLink : newerBlogLink, 
-			posts : posts 
+			posts : posts,
+			header : headerTemplate,
+			footer : footerTemplate
 		};
 		var html = renderBlog(jadeLocals);
 		serveData(response, html, "text/html");
@@ -232,30 +249,40 @@ function serveBlogPage(response, page) {
 /* CACHE INITIALIZATION */
 /************************/
 
-/*	Searches the BLOG_ROOT directory recursively, populates the 
- *	blog post cache array, and sorts the array from most recent 
- *	[0] to least recent [n-1].
+/*	First, searches the ARCHIVE_ROOT directory non-recursively and loads
+ *  any pre-existing blog posts into the blog cache. Second, searches
+ *	the BLOG_PATH_ROOT directory recursivle and loads any *new* blog posts
+ *	into the cache and creates an entry for the new blog post in the archive.
  */
 function populateBlogCache() {
-	var posts = false;
-	posts = readDirectory(BLOG_ROOT, true);
-	if(posts) {
-		for(var index = 0; index < posts.length; index++) {
-			if(posts[index].match(/.*\.html/)) {
-				var fileContents = String(readFileSync(posts[index]));
-				var post = JSON.parse(fileContents.match(METADATA_SECTION_REGEX)[0]);
-				post.path = posts[index];
-				post.url = BLOG_ROOT + post.title;
-				post.content = fileContents.replace(METADATA_SECTION_REGEX, '');
-				if(post.title && post.date) {
-					blogCache.push(post);
-				}
-				else {
-					console.log('A post at path ' + post.path + ' did not have properly formatted metadata');
+	var archivedPosts = false,
+			newPosts = false;
+	archivedPosts = readDirectory(ARCHIVE_ROOT, false);
+	if(archivedPosts) {
+		for(var index = 0; index < archivedPosts.length; index++) {
+			if(archivedPosts[index].match(/.*\.JSON$/)) {
+				blogCache.push(JSON.parse(String(readFileSync(archivedPosts[index]))));
+			}
+		}
+	}
+	if(VERBOSE) {
+		console.log('Detected ' + blogCache.length + ' archived blog posts.');
+	}
+	newPosts = readDirectory(BLOG_PATH_ROOT, true);
+	if(newPosts) {
+		for(var index = 0; index < newPosts.length; index++) {
+			if(newPosts[index].match(/.*\.md$/)) {
+				var fileContents = String(readFileSync(newPosts[index]));
+				var title = fileContents.match(TITLE_REGEX)[1];
+				if(!isArchived(title)) {
+					var post = constructPost(fileContents, title, newPosts[index]);
+					if(post.title && post.date) {
+						blogCache.push(post);
+						writeFile(ARCHIVE_ROOT + post.title + '.JSON', JSON.stringify(post));
+					}
 				}
 			}
 		}
-		// After all posts have been read, sort from newest to oldest
 		blogCache.sort(function(a,b) {
 			if(a.timeStamp && b.timeStamp)
 				return Date.parse(b.timeStamp) - Date.parse(a.timeStamp);
@@ -273,15 +300,25 @@ function populateStaticCache() {
 	var staticCacheSize = 0;
 	var pages = readDirectory(STATIC_ROOT, false);
 	for(var index = 0; index < pages.length; index++) {
-		if(pages[index].match(/.*\.html/)) {
-			var fileContents = String(readFileSync(pages[index]));
-			var page = JSON.parse(fileContents.match(METADATA_SECTION_REGEX)[0]);
-			page.content = fileContents.replace(METADATA_SECTION_REGEX, '');
+		if(pages[index].match(/.*\.md/)) {
+			var page = {};
+			page.content = String(readFileSync(pages[index]));
+			page.title = page.content.match(TITLE_REGEX)[1];
+			page.content = marked(page.content.replace(TITLE_REGEX, ''));
 			staticCache[pages[index]] = page;
 			staticCacheSize++;
 		}
 	}	
 	return staticCacheSize;
+}
+
+/*	Caches all relevant template files in memory
+ */
+function cacheTemplates() {
+	headerTemplate = String(readFileSync(HEADER_TEMPLATE));
+	footerTemplate = String(readFileSync(FOOTER_TEMPLATE));
+	blogTemplate = String(readFileSync(BLOG_TEMPLATE));
+	staticTemplate = String(readFileSync(STATIC_TEMPLATE));
 }
 
 /********************/
@@ -313,7 +350,7 @@ function setupRSS() {
 			url : blogCache[index].url,
 			date : blogCache[index].date,
 			categories : blogCache[index].categories,
-			author : blogCache[index].author || jarndyce.rss.author
+			author : jarndyce.rss.author
 		});
 	}
 	if(VERBOSE) 
@@ -402,6 +439,19 @@ function readFile(path, callback) {
 	});
 }
 
+/*	Writes a file to disk.
+ *	path, data (String)
+ */
+function writeFile(path, data) {
+	fs.open(path, 'w', function(err, fd) {
+		fs.write(fd, data, function(err, written, string) {
+			if(err) {
+				console.log('An error occurred while archiving a new blog post. Code: ' + err.code);
+			}
+		});
+	});
+}
+
 /*	Checks whether or not a file in the ./root/ directory is
  *	in the static cache. Returns true if the file with the given
  *	path is in the static cache, false otherwise.
@@ -412,6 +462,106 @@ function isInCache(path) {
 		return true;
 	}
 	return false;
+}
+
+/*	Checks whether the post with the given title is archived.
+ *	If the post with the given title is found in the archive,
+ *	return true, otherwise return false.
+ *	title (String)
+ */ 
+function isArchived(title) {
+	for(var index = 0; index < blogCache.length; index++) {
+		if(blogCache[index].title === title) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*	Constructs a post object with all relevant metadata.
+ *	fileContents, title, path (String)
+ */
+function constructPost(fileContents, title, path) {
+	var post = {};
+	post.title = title;
+	post.timeStamp = Date.now();
+	post.date = prettyDate(post.timeStamp);
+	post.path = path;
+	post.url = BLOG_URL_ROOT + post.title;
+	post.content = marked(fileContents.replace(TITLE_REGEX, ''));
+	post.categories = inferCategories(post.content);
+	return post;
+}
+
+/*	Determines which of the global category keywords the given 
+ *	post contains often enough to justify the post listing the
+ *	category.
+ *	postContent (String)
+ */
+function inferCategories(postContent) {
+	var categories = [];
+	var words = postContent.split(' ').length;
+	var globalCategories = jarndyce.rss.categories;
+	for(var index = 0; index < globalCategories.length; index++) {
+		var appearances = postContent.match(globalCategories[index]);
+		if(appearances) {
+			appearances = appearances.length;
+			if(appearances / words < CATEGORY_APPEARANCE_THRESHOLD) {
+				categories.push(globalCategories[index]);
+			}
+		}
+	}
+	return categories;
+}
+
+/*	Returns a nice-looking date string of the form “Month Day, Year”. 
+ *	For example, “January 4, 2015”.
+ *	timeStamp (Integer) - number of milliseconds since Jan. 1 1970
+ */
+function prettyDate(timeStamp) {
+	var date = new Date(timeStamp);
+	var year = date.getFullYear();
+	var month = date.getMonth();
+	var day = date.getDate();
+	switch(month) {
+		case 0:
+			month = "January";
+			break;
+		case 1:
+			month = "February";
+			break;
+		case 2:
+			month = "March";
+			break;
+		case 3: 
+			month = "April";
+			break;
+		case 4:
+			month = "May";
+			break;
+		case 5:
+			month = "June";
+			break;
+		case 6:
+			month = "July";
+			break;
+		case 7:
+			month = "August";
+			break;
+		case 8:
+			month = "September";
+			break;
+		case 9:
+			month = "October";
+			break;
+		case 10:
+			month = "November";
+			break;
+		case 11:
+			month = "December";
+			break;
+	}
+	return month + ' ' + String(day) + ', ' + String(year);
 }
 
 /*	Searches the cache of blog posts and returns the one with
@@ -432,11 +582,12 @@ function lookupPostByTitle(title) {
 /***********/
 
 app.get('/', function(request, response) {
-	response.redirect('/blog');
+	// Serve page 1 of the blog
+	serveBlogPage(response, 1);
 });
 
 app.get(BLOG_IMAGE_REGEX, function(request, response) {
-	var path = BLOG_ROOT + request.params[0] + request.params[1];
+	var path = BLOG_PATH_ROOT + request.params[0] + request.params[1];
 	serveBlogImage(response, path);
 });
 
@@ -467,8 +618,8 @@ app.get('/:slug', function(request, response) {
 		path = STATIC_ROOT + request.params.slug;
 	}
 	else {
-		// If necessary, append a '.html' suffix
-		path = STATIC_ROOT + request.params.slug + '.html';
+		// If necessary, append a '.md' suffix
+		path = STATIC_ROOT + request.params.slug + '.md';
 	}
 	servePage(response, path);
 });

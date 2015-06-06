@@ -8,17 +8,8 @@ html
 		title 
 			=title
 	body
-		h1
-			a(href="/") JARNDYCE SAMPLE SITE
-		ul
-			li
-				a(href="/blog") BLOG
-			li
-				a(href="/about") ABOUT
-			li
-				a(href="/contact") CONTACT
-			li
-				a(href="/rss") RSS
-			h1 
-				=title
+		!= header
+				h1 
+					=title
 			!=content
+		!= footer

@@ -15,17 +15,7 @@ html(lang="en")
 			else
 				=posts[0].title
 	body
-		h1
-			a(href="/") JARNDYCE SAMPLE SITE
-		ul
-			li
-				a(href="/") BLOG
-			li
-				a(href="/about") ABOUT
-			li
-				a(href="/contact") CONTACT
-			li
-				a(href="/rss") RSS
+		!= header
 			if posts.length === 0
 				p It doesn't look like there's anything here right now.
 			else
@@ -46,3 +36,4 @@ html(lang="en")
 						if newerBlogLink != false
 							li(style="float: left")
 								a(href=newerBlogLink) &#60;&#60; Newer
+		!= footer
