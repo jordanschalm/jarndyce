@@ -87,9 +87,7 @@ If you need to alter any of the metadata for a blog post that has already been a
 Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very basic sample templates are included, one for blogs and one for static pages.
 
 ## Plans For Future Versions
-Jarndyce is currently functional but feature-poor. Some features I plan to add include:
 * A standard stylesheet for distributions of Jarndyce that includes a footer and looks acceptable
-* Support for some sort of post categorization system, category links below each post, and viewing lists of posts by category
 
 
 ## Known Issues
