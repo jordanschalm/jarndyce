@@ -61,7 +61,7 @@ The blog.jade template includes the necessary code to perform client-side syntax
 ### Images
 Blog post files can be placed anywhere within the /blog/ directory and so can image files, so long as they have the proper image suffix (that is how the Express routing rules decide to treat them differently).
 
-If you want to, you can have all of blog Markdown files and all of your blog image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
+If you want to, you can have all of blog post HTML files and all of your blog post image files in the same directory, but it’s probably a good idea to keep all the files associated with each blog post in its own sub-directory of /blog/.
 
 ## Metadata
 Jarndyce tries to minimize the amount of metadata required in blog posts. The only metadata you need to explicitly specify in both blog posts and static pages is the title, which is formatted as a standard Markdown title.
@@ -83,9 +83,6 @@ The categories metadata is also determined when a blog post is first added. Jarn
 
 If you need to alter any of the metadata for a blog post that has already been added to the archive, you can do so by simply editing the JSON file in the /archive/ directory.
 
-## Markdown
-Jarndyce uses [Marked](https://github.com/chjj/marked "Marked") for Markdown to HTML conversion. Marked includes a 'smartypants' option which nicely formats double and triple dashes and single and double quotes, however in the version on their repository, dashes and quotes are converted to Unicode characters instead of HTML codes. If you have any en/em dashes or fancy quote marks, make sure you specify the HTML charset to be UTF-16 otherwise your content will be littered with garbage characters. The default charset for the blog.jade and static.jade templates is UTF-16.
-
 ## Templating
 Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very basic sample templates are included, one for blogs and one for static pages.
 
@@ -99,6 +96,11 @@ Jarndyce is currently functional but feature-poor. Some features I plan to add i
 * Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization
 
 ## Change Log
+
+### 1.1.1
+Improvement to Storage Efficiency - June 8, 2015
+* Removed post content from metadata files to increase storage efficiency
+* More graceful handling of EADDRINUSE errors on launch
 
 ### 1.1.0
 More Markdown, No More Metadata - June 5, 2015

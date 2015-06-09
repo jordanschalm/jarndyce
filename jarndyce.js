@@ -26,21 +26,22 @@ var STATIC_ROOT = './static/';
 var RESOURCE_ROOT = './static/resources/';
 var BLOG_PATH_ROOT = './blog/';
 var BLOG_URL_ROOT = '/blog/';
-var ARCHIVE_ROOT = './archive/';
+var METADATA_ROOT = './metadata/';
 var BLOG_PAGE_ROOT = '/blog/page/';
 var BLOG_TEMPLATE = './templates/blog.jade';
 var STATIC_TEMPLATE = './templates/static.jade';
 var HEADER_TEMPLATE = './templates/header.html';
 var FOOTER_TEMPLATE = './templates/footer.html';
 
-var TITLE_REGEX = /#.*?(\b.*?)\n/;
+var TITLE_REGEX = /#\s*?(\b.*?)\n/;
 var BLOG_IMAGE_REGEX = /\/blog\/(.*\.)(jpg|jpeg|png|tiff|gif|bmp)/i;
 
 var VERBOSE = false;
 var ALT_PORT = 3030;
 var POSTS_PER_PAGE = 5;
 var POSTS_IN_RSS = 25;
-var CATEGORY_APPEARANCE_THRESHOLD = 1 / 100; // 0.75 per 100 words
+var CATEGORY_APPEARANCE_THRESHOLD = 1 / 100; // 1% of words
+var MAX_CACHE_SIZE = 500;
 
 /******************/
 /* INITIALIZATION */
@@ -79,7 +80,7 @@ if(staticCacheSize === 1)
 else
 	console.log('Jarndyce has detected and cached ' + staticCacheSize + ' static pages.');
 
-// Add a HTTP header to all responses							
+// Add an HTTP header to all responses							
 var app = express();
 app.use(function (request, response, next) {
 	response.header('X-powered-by', 'Jarndyce v' + jarndyce.version);
@@ -88,6 +89,10 @@ app.use(function (request, response, next) {
 // Listen on the port assigned by Heroku or command line argument or ALT_PORT
 var server = http.createServer(app).listen(process.env.PORT || process.argv[2] || ALT_PORT, function() {
 	console.log('Jarndyce v' + jarndyce.version + ' running on port: %s', server.address().port);
+}).on('error', function(err) {
+	if(err.code === 'EADDRINUSE') {
+		console.log('Port ' + (process.env.PORT || process.argv[2] || ALT_PORT) + ' is in use. Exiting...');
+	}
 });
 
 if(VERBOSE) {
@@ -208,7 +213,9 @@ function serveBlogPost(response, post) {
 function serveBlogPage(response, page) {
 	// Check that the requested page is valid
 	if((page - 1) * POSTS_PER_PAGE >= blogCache.length && blogCache.length > 0) {
-		console.log('Requested blog page ' + page + ' is invalid.');
+		if(VERBOSE) {
+			console.log('Requested blog page ' + page + ' is invalid.');
+		}
 		send404(response);	// TODO custom 404 message indicating that the page is invalid
 	}
 	else {
@@ -219,7 +226,7 @@ function serveBlogPage(response, page) {
 			posts.push(blogCache[index]);
 		}
 		var olderBlogLink = false;
-		var newerBlogLink = false;
+	 	var newerBlogLink = false;
 		if(page > 1) {
 			newerBlogLink = BLOG_PAGE_ROOT + String(page - 1);
 		}
@@ -249,47 +256,16 @@ function serveBlogPage(response, page) {
 /* CACHE INITIALIZATION */
 /************************/
 
-/*	First, searches the ARCHIVE_ROOT directory non-recursively and loads
+/*	First, searches the METADATA_ROOT directory non-recursively and loads
  *  any pre-existing blog posts into the blog cache. Second, searches
  *	the BLOG_PATH_ROOT directory recursivle and loads any *new* blog posts
  *	into the cache and creates an entry for the new blog post in the archive.
  */
 function populateBlogCache() {
-	var archivedPosts = false,
-			newPosts = false;
-	archivedPosts = readDirectory(ARCHIVE_ROOT, false);
-	if(archivedPosts) {
-		for(var index = 0; index < archivedPosts.length; index++) {
-			if(archivedPosts[index].match(/.*\.JSON$/)) {
-				blogCache.push(JSON.parse(String(readFileSync(archivedPosts[index]))));
-			}
-		}
-	}
-	if(VERBOSE) {
-		console.log('Detected ' + blogCache.length + ' archived blog posts.');
-	}
-	newPosts = readDirectory(BLOG_PATH_ROOT, true);
-	if(newPosts) {
-		for(var index = 0; index < newPosts.length; index++) {
-			if(newPosts[index].match(/.*\.md$/)) {
-				var fileContents = String(readFileSync(newPosts[index]));
-				var title = fileContents.match(TITLE_REGEX)[1];
-				if(!isArchived(title)) {
-					var post = constructPost(fileContents, title, newPosts[index]);
-					if(post.title && post.date) {
-						blogCache.push(post);
-						writeFile(ARCHIVE_ROOT + post.title + '.JSON', JSON.stringify(post));
-					}
-				}
-			}
-		}
-		blogCache.sort(function(a,b) {
-			if(a.timeStamp && b.timeStamp)
-				return Date.parse(b.timeStamp) - Date.parse(a.timeStamp);
-			else
-				return Date.parse(b.date) - Date.parse(a.date);
-		});
-	}
+	var archive = readDirectory(METADATA_ROOT, false);
+	var metadata = loadMetadata(archive);
+	var blog = readDirectory(BLOG_PATH_ROOT, true);
+	loadBlog(blog, metadata);
 }
 
 /*	Searches the STATIC_ROOT directory NON-recursively and
@@ -356,6 +332,147 @@ function setupRSS() {
 	if(VERBOSE) 
 		console.log('Added ' + size + ' most recent posts to RSS feed');
 	return feed;
+}
+
+/*	Loads all blogs into the blog cache. If a blog post does not have
+ *	a metadata file associated with it, creates the metadata file.
+ *	blog( Array[String] ) - an array of paths to all files in the 
+ *		BLOG_PATH_ROOT directory and sub-directories
+ *	metadata( Object{String : Object} ) - a dictionary matching post
+ *		titles to objects containing post metadata
+ */
+function loadBlog(blog, metadata) {
+	for(var index = 0; index < blog.length; index++) {
+		var path = blog[index];
+		if(path.match(/.*\.md$/)) {
+			var content = String(readFileSync(path));
+			var title = content.match(TITLE_REGEX)[1];
+			// If we have metadata for the post, load it.
+			if(metadata[title]) {
+				blogCache.push(loadPost(content, metadata[title]));
+			}
+			// Otherwise, first create the post, then load it.
+			else {
+				blogCache.push(createPost(content, title, path));
+			}
+		}
+	}
+	// Sort the blog cache in chronological order
+	blogCache.sort(function(a,b) {
+		if(a.timeStamp && b.timeStamp)
+			return b.timeStamp - a.timeStamp;
+		else
+			return Date.parse(b.date) - Date.parse(a.date);
+	});
+}
+
+/*	Creates a metadata object for each file. Returns a dictionary
+ *	Object{String : Object} that matches post titles to an object
+ *	containing their metadata.
+ *	archive (Array[String]) - an array of paths to all files in 
+ *		the METADATA_ROOT directory
+ */
+function loadMetadata(archive) {
+	var metadata = {};
+	if(archive) {
+		for(var index = 0; index < archive.length; index++) {
+			var path = archive[index];
+			if(path.match(/.*\.JSON$/)) {
+				var postMetadata = JSON.parse(String(readFileSync(path)));
+				metadata[postMetadata.title] = postMetadata;
+			}
+		}
+	}
+	return metadata;
+}
+
+/*	Creates a post object with metadata, saves the metadata to 
+ *	the archive, and returns the post object.
+ *	content, title, path (String)
+ */
+function createPost(content, title, path) {
+	var post = {};
+	var postContent = content.replace(TITLE_REGEX, '');
+	post.title = title;
+	post.timeStamp = Date.now();
+	post.date = prettyDate(post.timeStamp);
+	post.path = path;
+	post.url = BLOG_URL_ROOT + post.title;
+	post.categories = inferCategories(postContent);
+	// Write metadata (not content) to the archive
+	writeFile(METADATA_ROOT + post.title + '.JSON', JSON.stringify(post, null, ' '));
+	post.content = marked(postContent);
+	return post;
+}
+
+/*	Loads a post object that already has metadata and returns it.
+ *	content (String)
+ *	metadata (Object)
+ */
+function loadPost(content, metadata) {
+	var post = metadata;
+	post.content = marked(content.replace(TITLE_REGEX, ''));
+	return post;
+}
+
+/*	Determines which of the global category keywords the given 
+ *	post contains often enough to justify the post listing the
+ *	category.
+ *	postContent (String)
+ */
+function inferCategories(postContent) {
+	var categories = [];
+	var words = postContent.split(' ').length;
+	var globalCategories = jarndyce.rss.categories;
+	for(var index = 0; index < globalCategories.length; index++) {
+		var appearances = postContent.match(globalCategories[index]);
+		if(appearances) {
+			appearances = appearances.length;
+			if(appearances / words < CATEGORY_APPEARANCE_THRESHOLD) {
+				categories.push(globalCategories[index]);
+			}
+		}
+	}
+	return categories;
+}
+
+/*	Checks whether or not a file in the ./static/ directory is
+ *	in the static cache. Returns true if the file with the given
+ *	path is in the static cache, false otherwise.
+ *	path (String)
+ */
+function isInCache(path) {
+	if(staticCache[path] != null) {
+		return true;
+	}
+	return false;
+}
+
+/*	Returns a nice-looking date string of the form “Month Day, Year”. 
+ *	For example, “January 4, 2015”.
+ *	timeStamp (Integer) - number of milliseconds since Jan. 1 1970
+ */
+function prettyDate(timeStamp) {
+	var months = ["January", "February", "March", "April", "May", "June", 
+								"July", "August", "September", "October", "November", "December"];	
+	var date = new Date(timeStamp);
+	var year = date.getFullYear();
+	var month = date.getMonth();
+	var day = date.getDate();
+	return months[month] + ' ' + String(day) + ', ' + String(year);
+}
+
+/*	Searches the cache of blog posts and returns the one with
+ *	the given title.
+ *	title (String)
+ */
+function lookupPostByTitle(title) {
+	for(var i = 0; i < blogCache.length; i++) {
+		if(blogCache[i].title === title) {
+			return blogCache[i];
+		}
+	}
+	return false;
 }
 
 /*	Searchs the directory at the given path and returns the paths
@@ -450,131 +567,6 @@ function writeFile(path, data) {
 			}
 		});
 	});
-}
-
-/*	Checks whether or not a file in the ./root/ directory is
- *	in the static cache. Returns true if the file with the given
- *	path is in the static cache, false otherwise.
- *	path (String)
- */
-function isInCache(path) {
-	if(staticCache[path] != null) {
-		return true;
-	}
-	return false;
-}
-
-/*	Checks whether the post with the given title is archived.
- *	If the post with the given title is found in the archive,
- *	return true, otherwise return false.
- *	title (String)
- */ 
-function isArchived(title) {
-	for(var index = 0; index < blogCache.length; index++) {
-		if(blogCache[index].title === title) {
-			return true;
-		}
-	}
-	return false;
-}
-
-/*	Constructs a post object with all relevant metadata.
- *	fileContents, title, path (String)
- */
-function constructPost(fileContents, title, path) {
-	var post = {};
-	post.title = title;
-	post.timeStamp = Date.now();
-	post.date = prettyDate(post.timeStamp);
-	post.path = path;
-	post.url = BLOG_URL_ROOT + post.title;
-	post.content = marked(fileContents.replace(TITLE_REGEX, ''));
-	post.categories = inferCategories(post.content);
-	return post;
-}
-
-/*	Determines which of the global category keywords the given 
- *	post contains often enough to justify the post listing the
- *	category.
- *	postContent (String)
- */
-function inferCategories(postContent) {
-	var categories = [];
-	var words = postContent.split(' ').length;
-	var globalCategories = jarndyce.rss.categories;
-	for(var index = 0; index < globalCategories.length; index++) {
-		var appearances = postContent.match(globalCategories[index]);
-		if(appearances) {
-			appearances = appearances.length;
-			if(appearances / words < CATEGORY_APPEARANCE_THRESHOLD) {
-				categories.push(globalCategories[index]);
-			}
-		}
-	}
-	return categories;
-}
-
-/*	Returns a nice-looking date string of the form “Month Day, Year”. 
- *	For example, “January 4, 2015”.
- *	timeStamp (Integer) - number of milliseconds since Jan. 1 1970
- */
-function prettyDate(timeStamp) {
-	var date = new Date(timeStamp);
-	var year = date.getFullYear();
-	var month = date.getMonth();
-	var day = date.getDate();
-	switch(month) {
-		case 0:
-			month = "January";
-			break;
-		case 1:
-			month = "February";
-			break;
-		case 2:
-			month = "March";
-			break;
-		case 3: 
-			month = "April";
-			break;
-		case 4:
-			month = "May";
-			break;
-		case 5:
-			month = "June";
-			break;
-		case 6:
-			month = "July";
-			break;
-		case 7:
-			month = "August";
-			break;
-		case 8:
-			month = "September";
-			break;
-		case 9:
-			month = "October";
-			break;
-		case 10:
-			month = "November";
-			break;
-		case 11:
-			month = "December";
-			break;
-	}
-	return month + ' ' + String(day) + ', ' + String(year);
-}
-
-/*	Searches the cache of blog posts and returns the one with
- *	the given title.
- *	title (String)
- */
-function lookupPostByTitle(title) {
-	for(var i = 0; i < blogCache.length; i++) {
-		if(blogCache[i].title === title) {
-			return blogCache[i];
-		}
-	}
-	return false;
 }
 
 /***********/
