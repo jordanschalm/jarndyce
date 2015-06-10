@@ -25,13 +25,13 @@
 var STATIC_ROOT = './static/';
 var RESOURCE_ROOT = './static/resources/';
 var BLOG_PATH_ROOT = './blog/';
-var BLOG_URL_ROOT = '/blog/';
 var METADATA_ROOT = './metadata/';
-var BLOG_PAGE_ROOT = '/blog/page/';
 var BLOG_TEMPLATE = './templates/blog.jade';
 var STATIC_TEMPLATE = './templates/static.jade';
 var HEADER_TEMPLATE = './templates/header.html';
 var FOOTER_TEMPLATE = './templates/footer.html';
+var BLOG_URL_ROOT = '/blog/';
+var BLOG_PAGE_URL_ROOT = '/blog/page/';
 
 var TITLE_REGEX = /#\s*?(\b.*?)\n/;
 var BLOG_IMAGE_REGEX = /\/blog\/(.*\.)(jpg|jpeg|png|tiff|gif|bmp)/i;
@@ -40,8 +40,14 @@ var VERBOSE = false;
 var ALT_PORT = 3030;
 var POSTS_PER_PAGE = 5;
 var POSTS_IN_RSS = 25;
-var CATEGORY_APPEARANCE_THRESHOLD = 1 / 100; // 1% of words
 var MAX_CACHE_SIZE = 500;
+var CATEGORY_APPEARANCE_THRESHOLD = 1 / 100; // 1% of words
+
+var ERR_EMPTY_DIRECTORY = 'Tried to read from an empty directory.';
+var ERR_FILE_DOES_NOT_EXIST = 'Tried to read a file that does not exist.';
+var ERR_METADATA_CONFLICT = 'Metadata files without accompanying blog post files were found.';
+var ERR_TITLE_CONFLICT = 'Two blog posts with the same title were found.';
+var ERR_INVALID_TITLE = 'No blog post with the given title was found.';
 
 /******************/
 /* INITIALIZATION */
@@ -62,8 +68,12 @@ var jarndyce = require('./package.json');
 var headerTemplate, footerTemplate, blogTemplate, staticTemplate;
 cacheTemplates();
 // Create an array that holds all blog posts in order from newest (0) to oldest (n-1).
+var numArchivedPosts, numNewPosts;
 var blogCache = [];
-populateBlogCache();
+populateBlogCache(function(archived, added) {
+	numArchivedPosts = archived;
+	numNewPosts = added;
+});
 // Create a reference for static pages (path, page)
 var staticCache = {};
 var staticCacheSize = populateStaticCache();
@@ -71,14 +81,7 @@ var staticCacheSize = populateStaticCache();
 var feed = setupRSS();
 var rssXML = feed.xml();
 
-if(blogCache.length === 1)
-	console.log('Jarndyce has detected and cached 1 blog post.');
-else 
-	console.log('Jarndyce has detected and cached ' + blogCache.length + ' blog posts.');
-if(staticCacheSize === 1) 
-	console.log('Jarndyce has detected and cached 1 static page.');
-else
-	console.log('Jarndyce has detected and cached ' + staticCacheSize + ' static pages.');
+logStatus();
 
 // Add an HTTP header to all responses							
 var app = express();
@@ -105,25 +108,31 @@ if(VERBOSE) {
 /* SERVING PAGES */
 /*****************/
 
-function send404(response) {
-	// TODO Change this to send a custom HTML 404 message
+/*	Sends a 404 HTTP response.
+ *	response (HTTPResponse)
+ */
+function send404(response, message) {
 	response.writeHead(404, {"Content-type" : "text/plain"});
-	response.write("Error 404: Resource not found.");
+	response.write(("Error 404: " + message) || "Error 404: Resource not found.");
 	response.end();
 }
 
+/*	Generic function to serve some data to a client.
+ *	response (HTTPResponse)
+ *	data, mimeType (String)
+ */
 function serveData(response, data, mimeType) {
 	response.writeHead(200, {"Content-type" : mimeType});
 	response.end(data);
 }
 
-/*	Serves a file from the STATIC_ROOT folder. First checks
- *	if the page is in the cache, if it is, the cached version is
- *	sent, otherwise, the file is read from disk and sent.
+/*	Serves a file from the STATIC_ROOT folder or the cache, if
+ *	posible. Sends a 404 response if the requested file does not
+ *	exist or if an error occurs while reading the file.
  *	path (String) - The path of the file to serve.
  */
 function servePage(response, path) {
-	if(isInCache(path)) {
+	if(isInStaticCache(path)) {
 		var page = staticCache[path]
 		var jadeOptions = { 
 			filename : page.title, 
@@ -143,10 +152,7 @@ function servePage(response, path) {
 	else {
 		readFile(path, function(data, err) {
 			if(err) {
-				console.log(err.code);
-				send404(response);
-			}
-			else if(!data) {
+				console.log(err);
 				send404(response);
 			}
 			else {
@@ -156,17 +162,15 @@ function servePage(response, path) {
 	}
 }
 
-/*	Serves an image from a blog post
+/*	Serves an image from a blog post. Sends a 404 response
+ *	if an error occurs while reading the file.
  *	path (String)
  */
 function serveBlogImage(response, path) {
 	readFile(path, function(data, err) {
 		if(err) {
-			console.log(err.code);
+			console.log(err);
 			send404(response);
-		}
-		else if(!data) {
-			send404(response)
 		}
 		else {
 			serveData(response, data, mime.lookup(path));
@@ -174,16 +178,20 @@ function serveBlogImage(response, path) {
 	});
 }
 
-/*	Serves an individual blog post with standard header and footer. The blog
- *	navigation controls are automatically added based on whether the 
- *	blog we are serving has earlier posts, later posts or both.
- *	post ({title, date, content, path, url})
+/*	Serves an individual blog post with standard header and 
+ *	footer. Sends a 404 response if post is not defined.
+ *	response (HTTPResponse)
+ *	title (String)
  */
-function serveBlogPost(response, post) {
-	if(!post) {
-		send404(response);
+function serveBlogPost(response, title) {
+	try {
+		var post = lookupPostByTitle(title);
 	}
-	else {
+	catch(err) {
+		console.log(err);
+		send404(response, 'No blog post with title ' + title + ' could be found.');
+	}
+	if(post) {
 		var posts = [post];
 		var index = blogCache.indexOf(post);
 		var jadeOptions = { 
@@ -205,18 +213,19 @@ function serveBlogPost(response, post) {
 	}
 }
 
-/*	Serves a blog page with at most POSTS_PER_PAGE posts in order from
- *	most recent to least recent. The first post on the page is the
- *	(POSTS_PER_PAGE * (page - 1) + 1) most recent post. The last post is
- *	the (POSTS_PER_PAGE * page) most recent post or the least recent post.
+/*	Serves a blog page with the given page number. If an
+ *	invalid page number is given, sends a 404 response.
+ *	response (HTTPResponse)
+ *	path (String)
  */
 function serveBlogPage(response, page) {
 	// Check that the requested page is valid
 	if((page - 1) * POSTS_PER_PAGE >= blogCache.length && blogCache.length > 0) {
+		var message = 'Requested blog page ' + page + ' is invalid.'
 		if(VERBOSE) {
-			console.log('Requested blog page ' + page + ' is invalid.');
+			console.log(message);
 		}
-		send404(response);	// TODO custom 404 message indicating that the page is invalid
+		send404(response, message);
 	}
 	else {
 		var posts = [];
@@ -228,10 +237,10 @@ function serveBlogPage(response, page) {
 		var olderBlogLink = false;
 	 	var newerBlogLink = false;
 		if(page > 1) {
-			newerBlogLink = BLOG_PAGE_ROOT + String(page - 1);
+			newerBlogLink = BLOG_PAGE_URL_ROOT + String(page - 1);
 		}
 		if(page * POSTS_PER_PAGE < blogCache.length) {
-			olderBlogLink = BLOG_PAGE_ROOT + String(page + 1);
+			olderBlogLink = BLOG_PAGE_URL_ROOT + String(page + 1);
 		}
 		var jadeOptions = {
 			filename : page, 
@@ -261,11 +270,21 @@ function serveBlogPage(response, page) {
  *	the BLOG_PATH_ROOT directory recursivle and loads any *new* blog posts
  *	into the cache and creates an entry for the new blog post in the archive.
  */
-function populateBlogCache() {
-	var archive = readDirectory(METADATA_ROOT, false);
+function populateBlogCache(callback) {
+	try {
+		var archive = readDirectory(METADATA_ROOT, false);
+		var blog = readDirectory(BLOG_PATH_ROOT, true);
+	}
+	catch(err) {
+		console.log(err);
+	}
 	var metadata = loadMetadata(archive);
-	var blog = readDirectory(BLOG_PATH_ROOT, true);
-	loadBlog(blog, metadata);
+	loadBlog(blog, metadata, function(err, numArchivedPosts, numNewPosts) {
+		if(err) {
+			console.log(err);
+		}
+		callback(numArchivedPosts, numNewPosts);
+	});
 }
 
 /*	Searches the STATIC_ROOT directory NON-recursively and
@@ -274,11 +293,22 @@ function populateBlogCache() {
  */
 function populateStaticCache() {
 	var staticCacheSize = 0;
-	var pages = readDirectory(STATIC_ROOT, false);
+	try {
+		var pages = readDirectory(STATIC_ROOT, false);
+	}
+	catch(err) {
+		console.log(err);
+	}
 	for(var index = 0; index < pages.length; index++) {
 		if(pages[index].match(/.*\.md/)) {
 			var page = {};
-			page.content = String(readFileSync(pages[index]));
+			try {
+				data = readFileSync(pages[index]);
+			} 
+			catch(err) {
+				console.log(err);
+			}
+			page.content = String(data);
 			page.title = page.content.match(TITLE_REGEX)[1];
 			page.content = marked(page.content.replace(TITLE_REGEX, ''));
 			staticCache[pages[index]] = page;
@@ -291,10 +321,15 @@ function populateStaticCache() {
 /*	Caches all relevant template files in memory
  */
 function cacheTemplates() {
-	headerTemplate = String(readFileSync(HEADER_TEMPLATE));
-	footerTemplate = String(readFileSync(FOOTER_TEMPLATE));
-	blogTemplate = String(readFileSync(BLOG_TEMPLATE));
-	staticTemplate = String(readFileSync(STATIC_TEMPLATE));
+	try {
+		headerTemplate = String(readFileSync(HEADER_TEMPLATE));
+		footerTemplate = String(readFileSync(FOOTER_TEMPLATE));
+		blogTemplate = String(readFileSync(BLOG_TEMPLATE));
+		staticTemplate = String(readFileSync(STATIC_TEMPLATE));
+	} 
+	catch (err) {
+		console.log(err);
+	}
 }
 
 /********************/
@@ -329,41 +364,10 @@ function setupRSS() {
 			author : jarndyce.rss.author
 		});
 	}
-	if(VERBOSE) 
+	if(VERBOSE) {
 		console.log('Added ' + size + ' most recent posts to RSS feed');
-	return feed;
-}
-
-/*	Loads all blogs into the blog cache. If a blog post does not have
- *	a metadata file associated with it, creates the metadata file.
- *	blog( Array[String] ) - an array of paths to all files in the 
- *		BLOG_PATH_ROOT directory and sub-directories
- *	metadata( Object{String : Object} ) - a dictionary matching post
- *		titles to objects containing post metadata
- */
-function loadBlog(blog, metadata) {
-	for(var index = 0; index < blog.length; index++) {
-		var path = blog[index];
-		if(path.match(/.*\.md$/)) {
-			var content = String(readFileSync(path));
-			var title = content.match(TITLE_REGEX)[1];
-			// If we have metadata for the post, load it.
-			if(metadata[title]) {
-				blogCache.push(loadPost(content, metadata[title]));
-			}
-			// Otherwise, first create the post, then load it.
-			else {
-				blogCache.push(createPost(content, title, path));
-			}
-		}
 	}
-	// Sort the blog cache in chronological order
-	blogCache.sort(function(a,b) {
-		if(a.timeStamp && b.timeStamp)
-			return b.timeStamp - a.timeStamp;
-		else
-			return Date.parse(b.date) - Date.parse(a.date);
-	});
+	return feed;
 }
 
 /*	Creates a metadata object for each file. Returns a dictionary
@@ -378,12 +382,68 @@ function loadMetadata(archive) {
 		for(var index = 0; index < archive.length; index++) {
 			var path = archive[index];
 			if(path.match(/.*\.JSON$/)) {
-				var postMetadata = JSON.parse(String(readFileSync(path)));
+				try {
+					var data = readFileSync(path)
+				}
+				catch(err) {
+					console.log(err);
+				}
+				var postMetadata = JSON.parse(String(data));
 				metadata[postMetadata.title] = postMetadata;
 			}
 		}
 	}
 	return metadata;
+}
+
+/*	Loads all blogs into the blog cache. If a blog post does not have
+ *	a metadata file associated with it, creates the metadata file.
+ *	blog( Array[String] ) - an array of paths to all files in the 
+ *		BLOG_PATH_ROOT directory and sub-directories
+ *	metadata( Object{String : Object} ) - a dictionary matching post
+ *		titles to objects containing post metadata
+ */
+function loadBlog(blog, metadata, callback) {
+	var numArchivedPosts = 0;
+	var numNewPosts = 0;
+	for(var index = 0; index < blog.length; index++) {
+		var path = blog[index];
+		if(path.match(/.*\.md$/)) {
+			try {
+				var data = readFileSync(path);
+			}
+			catch(err) {
+				console.log(err);
+			}
+			var content = String(data);
+			var title = content.match(TITLE_REGEX)[1];
+			// If we have metadata for the post, load it.
+			if(metadata[title]) {
+				blogCache.push(loadPost(content, metadata[title]));
+				numArchivedPosts++;
+			}
+			// Otherwise, first create the post, then load it.
+			else {
+				blogCache.push(createPost(content, title, path));
+				numNewPosts++;
+			}
+		}
+	}
+	var err = null;
+	if(numArchivedPosts < metadata.length) {
+		err = new Error(ERR_METADATA_CONFLICT);
+	}
+	else if(numArchivedPosts > metadata.length) {
+		err = new Error(ERR_TITLE_CONFLICT);
+	}
+	// Sort the blog cache in chronological order
+	blogCache.sort(function(a,b) {
+		if(a.timeStamp && b.timeStamp)
+			return b.timeStamp - a.timeStamp;
+		else
+			return Date.parse(b.date) - Date.parse(a.date);
+	});
+	callback(err, numArchivedPosts, numNewPosts);
 }
 
 /*	Creates a post object with metadata, saves the metadata to 
@@ -400,7 +460,12 @@ function createPost(content, title, path) {
 	post.url = BLOG_URL_ROOT + post.title;
 	post.categories = inferCategories(postContent);
 	// Write metadata (not content) to the archive
-	writeFile(METADATA_ROOT + post.title + '.JSON', JSON.stringify(post, null, ' '));
+	try {
+		writeFile(METADATA_ROOT + post.title + '.JSON', JSON.stringify(post, null, ' '));
+	}
+	catch(err) {
+		console.log(err);
+	}
 	post.content = marked(postContent);
 	return post;
 }
@@ -441,7 +506,7 @@ function inferCategories(postContent) {
  *	path is in the static cache, false otherwise.
  *	path (String)
  */
-function isInCache(path) {
+function isInStaticCache(path) {
 	if(staticCache[path] != null) {
 		return true;
 	}
@@ -472,24 +537,51 @@ function lookupPostByTitle(title) {
 			return blogCache[i];
 		}
 	}
-	return false;
+	throw new Error('No blog post with title ' + title + ' could be found.');
 }
+
+/*	Prints a series of messages to the console indicating
+ *	the number of blog posts and pages that have been
+ *	cached.
+ */
+function logStatus() {
+	if(VERBOSE) {
+		if(numArchivedPosts === 1)
+			console.log('Jarndyce has cached 1 archived blog post.');
+		else
+			console.log('Jarndyce has cached ' + numArchivedPosts + ' archived blog posts.');
+		if(numNewPosts === 1) 
+			console.log('Jarndyce has cached 1 new blog post.');
+		else
+			console.log('Jarndyce has cached ' + numNewPosts + ' new blog posts.');
+	}
+	if(blogCache.length === 1)
+		console.log('Jarndyce has cached 1 total blog post.');
+	else 
+		console.log('Jarndyce has cached ' + blogCache.length + ' total blog posts.');
+	if(staticCacheSize === 1) 
+		console.log('Jarndyce has cached 1 static page.');
+	else
+		console.log('Jarndyce has cached ' + staticCacheSize + ' static pages.');
+}
+
+/**********************/
+/* FILE I/O FUNCTIONS */
+/**********************/
 
 /*	Searchs the directory at the given path and returns the paths
  *	of all non-hidden files. If recursive = true, it will return 
  *	the paths of all non-hidden files in any subdirectories as well.
- *	NOTE: currently just eats any FS errors that may occur
  *	path (String)
  *	recursive (Boolean)
  */
 function readDirectory(path, recursive) {
-	var files = false;
 	try {
-		files = fs.readdirSync(path);
+		var files = fs.readdirSync(path);
 	}	catch (err) {
-			console.log('An error occurred while reading the directory at path ' + path + '. Code: ' + err.code);
+			throw err;
 	}
-	if(files) {
+	if(files.length > 0) {
 		var notHidden = [];
 		for(var index = 0; index < files.length; index++) {
 			// Filter out hidden files
@@ -506,12 +598,14 @@ function readDirectory(path, recursive) {
 		}
 		return notHidden;
 	}
+	else {
+		throw new Error(ERR_EMPTY_DIRECTORY);
+	}
 }
 
 /*	Reads the file at the specified path, if it exists, and
  *	returns the contents of the file. This function is used
  *	for initialization when we want things to happen sync.
- *	NOTE: currently just eats any FS errors that may occur
  *	path (String)
  */
 function readFileSync(path) {
@@ -519,12 +613,13 @@ function readFileSync(path) {
 		try {
 			var data = fs.readFileSync(path);
 			return data;
-		} catch (err) {
-			console.log('An error occurred while reading the file at path ' + path + '. Code: ' + err.code);
+		} 
+		catch (err) {
+			throw err;
 		}
 	}
 	else {
-		console.log('The file at path: ' + path + ' does not exist');
+		throw new Error(ERR_FILE_DOES_NOT_EXIST);
 	}
 }
 
@@ -532,7 +627,6 @@ function readFileSync(path) {
  *	returns the contents of the file. This function is used
  *	after initialization is complete when we want things to
  *	happen synchronously.
- *	NOTE: Currently eats FS errors
  *	path (String)
  *	callback (function) - Has a single parameter, the data
  *	that was read from the file, and the error if one was
@@ -551,7 +645,7 @@ function readFile(path, callback) {
 			});
 		}
 		else {
-			callback(false);
+			callback(null, new Error(ERR_FILE_DOES_NOT_EXIST));
 		}
 	});
 }
@@ -563,15 +657,15 @@ function writeFile(path, data) {
 	fs.open(path, 'w', function(err, fd) {
 		fs.write(fd, data, function(err, written, string) {
 			if(err) {
-				console.log('An error occurred while archiving a new blog post. Code: ' + err.code);
+				throw err;
 			}
 		});
 	});
 }
 
-/***********/
-/* ROUTING */
-/***********/
+/*******************/
+/* EXPRESS ROUTING */
+/*******************/
 
 app.get('/', function(request, response) {
 	// Serve page 1 of the blog
@@ -595,7 +689,7 @@ app.get('/blog/page/:page', function(request, response) {
 app.get('/blog/:title', function(request, response) {
 	// Replace -'s in the URL with spaces
 	var title = request.params.title;
-	serveBlogPost(response, lookupPostByTitle(title));
+	serveBlogPost(response, title);
 });
 
 app.get('/rss', function(request, response) {
