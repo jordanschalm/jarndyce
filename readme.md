@@ -88,12 +88,20 @@ Jarndyce uses [Jade](http://jade-lang.com “Jade”) for templating. Two very b
 
 ## Plans For Future Versions
 * A standard stylesheet for distributions of Jarndyce that includes a footer and looks acceptable
-
+* Support for arbitrary number of blog posts by using a LRU blog cache
 
 ## Known Issues
 * Currently Jarndyce will cache ALL detected blog posts and ALL detected static pages no matter how many there are. For a site with a large archive, this could lead to Jarndyce crashing during initialization if there isn't enough memory available.
 
 ## Change Log
+
+### 1.1.2 
+Error Fixes & More Robust Error Handling - June 10, 2015
+* Changed File I/O error handling pattern so that lower-level functions always wrap and throw errors instead of dealing with them directly
+* Added some custom callback errors
+* Improved documentation for all functions
+* Generally standardized error handling patterns so that errors are *usually* dealt with at the top of the stack
+* Commented out link to site.css in templates to prevent unhelpful IO errors when running Jarndyce vanilla
 
 ### 1.1.1
 Improvement to Storage Efficiency - June 8, 2015
