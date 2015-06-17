@@ -29,7 +29,8 @@ html(lang="en")
 							= posts[i].date
 						!= posts[i].content
 					if i != posts.length - 1
-			if olderBlogLink === true || newerBlogLink === true
+						hr
+			if olderBlogLink != false || newerBlogLink != false
 				#blog-nav
 					ul.blog-nav
 						if olderBlogLink != false
