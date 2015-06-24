@@ -34,7 +34,7 @@ var BLOG_URL_ROOT = '/blog/';
 var BLOG_PAGE_URL_ROOT = '/blog/page/';
 
 var TITLE_REGEX = /#\s*?(\b.*?)\n/;
-var BLOG_IMAGE_REGEX = /\/blog\/(.*\.)(jpg|jpeg|png|tiff|gif|bmp)/i;
+var BLOG_IMAGE_REGEX = /\/blog\/(.*?\.)(jpg|jpeg|png|tiff|gif|bmp)/i;
 
 var VERBOSE = false;
 var ALT_PORT = 3030;
@@ -42,12 +42,6 @@ var POSTS_PER_PAGE = 5;
 var POSTS_IN_RSS = 25;
 var MAX_CACHE_SIZE = 500;
 var CATEGORY_APPEARANCE_THRESHOLD = 1 / 100; // 1% of words
-
-var ERR_EMPTY_DIRECTORY = 'Tried to read from an empty directory.';
-var ERR_FILE_DOES_NOT_EXIST = 'Tried to read a file that does not exist.';
-var ERR_METADATA_CONFLICT = 'Metadata files without accompanying blog post files were found.';
-var ERR_TITLE_CONFLICT = 'Two blog posts with the same title were found.';
-var ERR_INVALID_TITLE = 'No blog post with the given title was found.';
 
 /******************/
 /* INITIALIZATION */
@@ -109,7 +103,6 @@ if(VERBOSE) {
 /*****************/
 
 /*	Sends a 404 HTTP response.
- *	response (HTTPResponse)
  */
 function send404(response, message) {
 	response.writeHead(404, {"Content-type" : "text/plain"});
@@ -118,7 +111,7 @@ function send404(response, message) {
 }
 
 /*	Generic function to serve some data to a client.
- *	response (HTTPResponse)
+ *
  *	data, mimeType (String)
  */
 function serveData(response, data, mimeType) {
@@ -129,7 +122,8 @@ function serveData(response, data, mimeType) {
 /*	Serves a file from the STATIC_ROOT folder or the cache, if
  *	posible. Sends a 404 response if the requested file does not
  *	exist or if an error occurs while reading the file.
- *	path (String) - The path of the file to serve.
+ *
+ *	path (String)
  */
 function servePage(response, path) {
 	if(isInStaticCache(path)) {
@@ -139,18 +133,18 @@ function servePage(response, path) {
 			pretty : true,
 			cache : true 
 		};	
-		var renderBlog = jade.compile(staticTemplate, jadeOptions);
+		var render = jade.compile(staticTemplate, jadeOptions);
 		var jadeLocals = { 
 			title : page.title ,
 			content : page.content,
 			header : headerTemplate,
 			footer : footerTemplate
 		};	
-		var html = renderBlog(jadeLocals);
+		var html = render(jadeLocals);
 		serveData(response, html, "text/html");
 	}
 	else {
-		readFile(path, function(data, err) {
+		readFile(path, function(err, data) {
 			if(err) {
 				console.log(err);
 				send404(response);
@@ -164,10 +158,11 @@ function servePage(response, path) {
 
 /*	Serves an image from a blog post. Sends a 404 response
  *	if an error occurs while reading the file.
+ *
  *	path (String)
  */
 function serveBlogImage(response, path) {
-	readFile(path, function(data, err) {
+	readFile(path, function(err, data) {
 		if(err) {
 			console.log(err);
 			send404(response);
@@ -180,7 +175,7 @@ function serveBlogImage(response, path) {
 
 /*	Serves an individual blog post with standard header and 
  *	footer. Sends a 404 response if post is not defined.
- *	response (HTTPResponse)
+ *	
  *	title (String)
  */
 function serveBlogPost(response, title) {
@@ -193,29 +188,14 @@ function serveBlogPost(response, title) {
 	}
 	if(post) {
 		var posts = [post];
-		var index = blogCache.indexOf(post);
-		var jadeOptions = { 
-			filename : post.title, 
-			pretty : true,
-			cache : true 
-		};	
-		var renderBlog = jade.compile(blogTemplate, jadeOptions);
-		var jadeLocals = { 
-			page : false, 
-			olderBlogLink : false,
-			newerBlogLink : false, 
-			posts : posts,
-			header : headerTemplate,
-			footer : footerTemplate
-		};	
-		var html = renderBlog(jadeLocals);
+		var html = renderBlog(posts, false);
 		serveData(response, html, "text/html");
 	}
 }
 
 /*	Serves a blog page with the given page number. If an
  *	invalid page number is given, sends a 404 response.
- *	response (HTTPResponse)
+ *	
  *	path (String)
  */
 function serveBlogPage(response, page) {
@@ -234,29 +214,7 @@ function serveBlogPage(response, page) {
 		for(var index = start; index < end; index++) {
 			posts.push(blogCache[index]);
 		}
-		var olderBlogLink = false;
-	 	var newerBlogLink = false;
-		if(page > 1) {
-			newerBlogLink = BLOG_PAGE_URL_ROOT + String(page - 1);
-		}
-		if(page * POSTS_PER_PAGE < blogCache.length) {
-			olderBlogLink = BLOG_PAGE_URL_ROOT + String(page + 1);
-		}
-		var jadeOptions = {
-			filename : page, 
-			pretty : true,
-			cache : true 
-		};
-		var renderBlog = jade.compile(blogTemplate, jadeOptions);
-		var jadeLocals = { 
-			page : page, 
-			olderBlogLink : olderBlogLink,
-		  newerBlogLink : newerBlogLink, 
-			posts : posts,
-			header : headerTemplate,
-			footer : footerTemplate
-		};
-		var html = renderBlog(jadeLocals);
+		var html = renderBlog(posts, page);
 		serveData(response, html, "text/html");
 	}
 }
@@ -265,10 +223,14 @@ function serveBlogPage(response, page) {
 /* CACHE INITIALIZATION */
 /************************/
 
-/*	First, searches the METADATA_ROOT directory non-recursively and loads
- *  any pre-existing blog posts into the blog cache. Second, searches
- *	the BLOG_PATH_ROOT directory recursivle and loads any *new* blog posts
- *	into the cache and creates an entry for the new blog post in the archive.
+/*	First, searches the METADATA_ROOT directory non-recursively and 
+ *  loads any pre-existing blog posts into the blog cache. Second,
+ *	searches the BLOG_PATH_ROOT directory recursivle and loads any 
+ *	new blog posts into the cache and creates an entry for the new
+ *	blog post in the archive.
+ *
+ *	callback (function(Number, Number)) - passes the number of
+ *		archived and new posts to the caller
  */
 function populateBlogCache(callback) {
 	try {
@@ -336,6 +298,42 @@ function cacheTemplates() {
 /* HELPER FUNCTIONS */
 /********************/
 
+/*	Renders a blog page or blog post using the global template
+ *	variables and returns a client-ready string in HTML.
+ *	
+ *	posts (Array<Post>) - an array of post objects that are to be
+ *		rendered on the page
+ *	page (Number) - the page number or false, if we are serving a
+ *		single post
+ */
+function renderBlog(posts, page) {
+	var olderBlogLink = false;
+ 	var newerBlogLink = false;
+	if(page) {
+		if(page > 1) {
+			newerBlogLink = BLOG_PAGE_URL_ROOT + String(page - 1);
+		}
+		if(page * POSTS_PER_PAGE < blogCache.length) {
+			olderBlogLink = BLOG_PAGE_URL_ROOT + String(page + 1);
+		}
+	}
+	var jadeOptions = {
+		fileName: page || posts[0].title,
+		pretty: true,
+		cache: true
+	};
+	var render = jade.compile(blogTemplate, jadeOptions);
+	var jadeLocals = {
+		page: page,
+		olderBlogLink: olderBlogLink,
+		newerBlogLink: newerBlogLink,
+		posts: posts,
+		header: headerTemplate,
+		footer: footerTemplate
+	}
+	return render(jadeLocals);
+}
+
 /*	Adds POSTS_IN_RSS blog posts in the cache to the site's RSS feed
  *	All RSS info is pulled from the package.json file.
  */
@@ -371,9 +369,10 @@ function setupRSS() {
 }
 
 /*	Creates a metadata object for each file. Returns a dictionary
- *	Object{String : Object} that matches post titles to an object
+ *	Object<String : Object> that matches post titles to an object
  *	containing their metadata.
- *	archive (Array[String]) - an array of paths to all files in 
+ *
+ *	archive (Array<String>) - an array of paths to all files in 
  *		the METADATA_ROOT directory
  */
 function loadMetadata(archive) {
@@ -398,9 +397,10 @@ function loadMetadata(archive) {
 
 /*	Loads all blogs into the blog cache. If a blog post does not have
  *	a metadata file associated with it, creates the metadata file.
- *	blog( Array[String] ) - an array of paths to all files in the 
+ *
+ *	blog( Array<String> ) - an array of paths to all files in the 
  *		BLOG_PATH_ROOT directory and sub-directories
- *	metadata( Object{String : Object} ) - a dictionary matching post
+ *	metadata( Object<String : Object> ) - a dictionary matching post
  *		titles to objects containing post metadata
  */
 function loadBlog(blog, metadata, callback) {
@@ -431,10 +431,10 @@ function loadBlog(blog, metadata, callback) {
 	}
 	var err = null;
 	if(numArchivedPosts < metadata.length) {
-		err = new Error(ERR_METADATA_CONFLICT);
+		err = new Error("One or more metadata files were found without matching post files.");
 	}
 	else if(numArchivedPosts > metadata.length) {
-		err = new Error(ERR_TITLE_CONFLICT);
+		err = new Error("Two or more posts with the same title were detected.");
 	}
 	// Sort the blog cache in chronological order
 	blogCache.sort(function(a,b) {
@@ -446,8 +446,9 @@ function loadBlog(blog, metadata, callback) {
 	callback(err, numArchivedPosts, numNewPosts);
 }
 
-/*	Creates a post object with metadata, saves the metadata to 
- *	the archive, and returns the post object.
+/*	Creates a post object with metadata, saves the metadata to the
+ *	archive, and returns the post object.
+ *
  *	content, title, path (String)
  */
 function createPost(content, title, path) {
@@ -467,22 +468,28 @@ function createPost(content, title, path) {
 		console.log(err);
 	}
 	post.content = marked(postContent);
+	if(VERBOSE) 
+		console.log("Created a new post with title " + post.title);
 	return post;
 }
 
 /*	Loads a post object that already has metadata and returns it.
+ *
  *	content (String)
  *	metadata (Object)
  */
 function loadPost(content, metadata) {
 	var post = metadata;
 	post.content = marked(content.replace(TITLE_REGEX, ''));
+	if(VERBOSE)
+		console.log("Loaded an archived post with title " + post.title);
 	return post;
 }
 
 /*	Determines which of the global category keywords the given 
  *	post contains often enough to justify the post listing the
  *	category.
+ *
  *	postContent (String)
  */
 function inferCategories(postContent) {
@@ -504,6 +511,7 @@ function inferCategories(postContent) {
 /*	Checks whether or not a file in the ./static/ directory is
  *	in the static cache. Returns true if the file with the given
  *	path is in the static cache, false otherwise.
+ *
  *	path (String)
  */
 function isInStaticCache(path) {
@@ -515,7 +523,8 @@ function isInStaticCache(path) {
 
 /*	Returns a nice-looking date string of the form “Month Day, Year”. 
  *	For example, “January 4, 2015”.
- *	timeStamp (Integer) - number of milliseconds since Jan. 1 1970
+ *
+ *	timeStamp (Number) - number of milliseconds since Jan. 1 1970
  */
 function prettyDate(timeStamp) {
 	var months = ["January", "February", "March", "April", "May", "June", 
@@ -527,8 +536,9 @@ function prettyDate(timeStamp) {
 	return months[month] + ' ' + String(day) + ', ' + String(year);
 }
 
-/*	Searches the cache of blog posts and returns the one with
- *	the given title.
+/*	Searches the cache of blog posts and returns the one with the
+ *  given title.
+ *
  *	title (String)
  */
 function lookupPostByTitle(title) {
@@ -540,9 +550,8 @@ function lookupPostByTitle(title) {
 	throw new Error('No blog post with title ' + title + ' could be found.');
 }
 
-/*	Prints a series of messages to the console indicating
- *	the number of blog posts and pages that have been
- *	cached.
+/*	Prints a series of messages to the console indicating the number
+ *	of blog posts and pages that have been cached.
  */
 function logStatus() {
 	if(VERBOSE) {
@@ -572,13 +581,16 @@ function logStatus() {
 /*	Searchs the directory at the given path and returns the paths
  *	of all non-hidden files. If recursive = true, it will return 
  *	the paths of all non-hidden files in any subdirectories as well.
+ *
  *	path (String)
  *	recursive (Boolean)
  */
 function readDirectory(path, recursive) {
+	var files = [];
 	try {
-		var files = fs.readdirSync(path);
-	}	catch (err) {
+		files = fs.readdirSync(path);
+	}	
+	catch (err) {
 			throw err;
 	}
 	if(files.length > 0) {
@@ -599,13 +611,14 @@ function readDirectory(path, recursive) {
 		return notHidden;
 	}
 	else {
-		throw new Error(ERR_EMPTY_DIRECTORY);
+		throw new Error("The directory at path " + path + " is empty.");
 	}
 }
 
-/*	Reads the file at the specified path, if it exists, and
- *	returns the contents of the file. This function is used
- *	for initialization when we want things to happen sync.
+/*	Reads the file at the specified path, if it exists, and returns
+ *	the contents of the file. This function is used for initialization
+ *	when we want things to happen synchronously.
+ *
  *	path (String)
  */
 function readFileSync(path) {
@@ -619,45 +632,48 @@ function readFileSync(path) {
 		}
 	}
 	else {
-		throw new Error(ERR_FILE_DOES_NOT_EXIST);
+		throw new Error("The file at path " + path + " does not exist.");
 	}
 }
 
-/*	Reads the file at the specified path, if it exists, and
- *	returns the contents of the file. This function is used
- *	after initialization is complete when we want things to
- *	happen synchronously.
+/*	Reads the file at the specified path, if it exists, and returns
+ *	the contents of the file. This function is used after
+ *	initialization is complete when we want things to happen
+ *	asynchronously.
+ *
  *	path (String)
- *	callback (function) - Has a single parameter, the data
- *	that was read from the file, and the error if one was
- *	thrown.
+ *	callback (function(err, data))
  */
 function readFile(path, callback) {
 	fs.exists(path, function(exists) {
 		if(exists) {
 			fs.readFile(path, function(err, data) {
 				if(err) {
-					callback(data, err);
+					callback(err, data);
 				}
 				else {
-					callback(data);
+					callback(null, data);
 				}
 			});
 		}
 		else {
-			callback(null, new Error(ERR_FILE_DOES_NOT_EXIST));
+			callback(new Error("The file at path " + path + " does not exist."));
 		}
 	});
 }
 
 /*	Writes a file to disk.
+ *
  *	path, data (String)
  */
 function writeFile(path, data) {
 	fs.open(path, 'w', function(err, fd) {
 		fs.write(fd, data, function(err, written, string) {
 			if(err) {
-				throw err;
+				callback(err, written, string);
+			}
+			else {
+				callback(null, written, string);
 			}
 		});
 	});
@@ -687,7 +703,6 @@ app.get('/blog/page/:page', function(request, response) {
 });
 
 app.get('/blog/:title', function(request, response) {
-	// Replace -'s in the URL with spaces
 	var title = request.params.title;
 	serveBlogPost(response, title);
 });
