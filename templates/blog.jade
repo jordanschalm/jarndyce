@@ -16,7 +16,7 @@ html(lang="en")
 			else
 				=posts[0].title
 	body
-		!= header
+		include ./templates/header.jade
 			if posts.length === 0
 				p It doesn't look like there's anything here right now.
 			else
@@ -39,4 +39,4 @@ html(lang="en")
 						if newerBlogLink != false
 							li(style="float: left")
 								a(href=newerBlogLink) &#60;&#60; Newer
-		!= footer
+		include ./templates/footer.jade

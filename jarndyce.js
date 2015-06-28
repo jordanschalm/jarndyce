@@ -28,8 +28,6 @@ var BLOG_PATH_ROOT = './blog/';
 var METADATA_ROOT = './metadata/';
 var BLOG_TEMPLATE = './templates/blog.jade';
 var STATIC_TEMPLATE = './templates/static.jade';
-var HEADER_TEMPLATE = './templates/header.html';
-var FOOTER_TEMPLATE = './templates/footer.html';
 var BLOG_URL_ROOT = '/blog/';
 var BLOG_PAGE_URL_ROOT = '/blog/page/';
 
@@ -59,7 +57,7 @@ var express = require('express');
 var jarndyce = require('./package.json');
 
 // Find and cache templates
-var headerTemplate, footerTemplate, blogTemplate, staticTemplate;
+var blogTemplate, staticTemplate;
 cacheTemplates();
 // Create an array that holds all blog posts in order from newest (0) to oldest (n-1).
 var numArchivedPosts, numNewPosts;
@@ -136,9 +134,7 @@ function servePage(response, path) {
 		var render = jade.compile(staticTemplate, jadeOptions);
 		var jadeLocals = { 
 			title : page.title ,
-			content : page.content,
-			header : headerTemplate,
-			footer : footerTemplate
+			content : page.content
 		};	
 		var html = render(jadeLocals);
 		serveData(response, html, "text/html");
@@ -284,8 +280,6 @@ function populateStaticCache() {
  */
 function cacheTemplates() {
 	try {
-		headerTemplate = String(readFileSync(HEADER_TEMPLATE));
-		footerTemplate = String(readFileSync(FOOTER_TEMPLATE));
 		blogTemplate = String(readFileSync(BLOG_TEMPLATE));
 		staticTemplate = String(readFileSync(STATIC_TEMPLATE));
 	} 
@@ -318,7 +312,7 @@ function renderBlog(posts, page) {
 		}
 	}
 	var jadeOptions = {
-		fileName: page || posts[0].title,
+		filename: page || posts[0].title,
 		pretty: true,
 		cache: true
 	};
@@ -327,9 +321,7 @@ function renderBlog(posts, page) {
 		page: page,
 		olderBlogLink: olderBlogLink,
 		newerBlogLink: newerBlogLink,
-		posts: posts,
-		header: headerTemplate,
-		footer: footerTemplate
+		posts: posts
 	}
 	return render(jadeLocals);
 }
