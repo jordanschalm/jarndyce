@@ -133,7 +133,7 @@ function servePage(response, path) {
 		};	
 		var render = jade.compile(staticTemplate, jadeOptions);
 		var jadeLocals = { 
-			title : page.title ,
+			title : page.title,
 			content : page.content
 		};	
 		var html = render(jadeLocals);
