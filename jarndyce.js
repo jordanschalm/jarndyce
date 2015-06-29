@@ -28,6 +28,7 @@ var BLOG_PATH_ROOT = './blog/';
 var METADATA_ROOT = './metadata/';
 var BLOG_TEMPLATE = './templates/blog.jade';
 var STATIC_TEMPLATE = './templates/static.jade';
+
 var BLOG_URL_ROOT = '/blog/';
 var BLOG_PAGE_URL_ROOT = '/blog/page/';
 
@@ -124,6 +125,7 @@ function serveData(response, data, mimeType) {
  *	path (String)
  */
 function servePage(response, path) {
+	// If it's in the static cache, render and serve a Jade template
 	if(isInStaticCache(path)) {
 		var page = staticCache[path]
 		var jadeOptions = { 
@@ -139,6 +141,7 @@ function servePage(response, path) {
 		var html = render(jadeLocals);
 		serveData(response, html, "text/html");
 	}
+	// Otherwise, read and serve the required file.
 	else {
 		readFile(path, function(err, data) {
 			if(err) {
@@ -220,7 +223,7 @@ function serveBlogPage(response, page) {
 /************************/
 
 /*	First, searches the METADATA_ROOT directory non-recursively and 
- *  loads any pre-existing blog posts into the blog cache. Second,
+ *	loads any pre-existing blog posts into the blog cache. Second,
  *	searches the BLOG_PATH_ROOT directory recursivle and loads any 
  *	new blog posts into the cache and creates an entry for the new
  *	blog post in the archive.
@@ -490,11 +493,8 @@ function inferCategories(postContent) {
 	var globalCategories = jarndyce.rss.categories;
 	for(var index = 0; index < globalCategories.length; index++) {
 		var appearances = postContent.match(globalCategories[index]);
-		if(appearances) {
-			appearances = appearances.length;
-			if(appearances / words < CATEGORY_APPEARANCE_THRESHOLD) {
-				categories.push(globalCategories[index]);
-			}
+		if(appearances && (appearances.length / words < CATEGORY_APPEARANCE_THRESHOLD)) {
+			categories.push(globalCategories[index]);
 		}
 	}
 	return categories;
@@ -705,7 +705,6 @@ app.get('/rss', function(request, response) {
 
 app.get('/:slug', function(request, response) {
 	var path;
-	
 	if(request.params.slug.match(/.*\..*/)) {
 		// The path already has a suffix
 		path = STATIC_ROOT + request.params.slug;
