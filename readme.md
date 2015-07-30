@@ -1,7 +1,7 @@
 # Jarndyce – Web Server & Blogging Engine
 
 ## Introduction
-Jarndyce is a light-weight web server for sites with static pages (about, contact, etc.) and a blog. It uses Markdown for content, HTML for standard page elements like headers and footers, and Jade for templating.
+Jarndyce is a light-weight web server for sites with static pages (about, contact, etc.) and a blog. It uses Markdown for content and Jade for templating.
 
 ## Installation
 Make sure you have Node and NPM installed (http://nodejs.org)
