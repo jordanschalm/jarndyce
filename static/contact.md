@@ -1,3 +1,0 @@
-# Contact
-
-Sample contact page.
