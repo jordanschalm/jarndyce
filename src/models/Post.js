@@ -1,6 +1,6 @@
 import Mongoose from 'mongoose';
 
-const Post = Mongoose.Schema({
+const Post = new Mongoose.Schema({
 	body: {
 		type: String,
 		required: true
@@ -9,11 +9,14 @@ const Post = Mongoose.Schema({
 		type: Date,
 		default: Date.now()
 	},
-	title: String,
-	url: {
+	slug: {
+		type: String,
+		required: true
+	},
+	title: {
 		type: String,
 		required: true
 	}
 });
 
-export default Mongoose.Model('Post', Post);
+export default Mongoose.model('Post', Post);
