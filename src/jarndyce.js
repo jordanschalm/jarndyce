@@ -1,15 +1,11 @@
 import 'babel-polyfill';
 
+import Core from './core';
 import Mongoose from 'mongoose';
 import Router from './router';
+import Utils from './utils';
 
 class Jarndyce {
-	/**
-		Initiate an instance of Jarndyce with the given options
-		@param {Object} options
-			* app {Object} - instance of Express
-			* mongoUri {String} - URI of database to connect to
-	*/
 	init (options) {
 		if (Utils.validate(options, 'initOptions')) {
 			const {
@@ -26,8 +22,17 @@ class Jarndyce {
 		return Core.add(payload);
 	}
 
+	get (slug) {
+		return Core.get(slug);
+	}
+
+	getPage (options) {
+		return Core.getPage(options);
+	}
+
 	remove (slug) {
 		return Core.remove(slug);
+	}
 }
 
 exports = module.exports = new Jarndyce();

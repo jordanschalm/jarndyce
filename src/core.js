@@ -1,3 +1,4 @@
+import Marked from 'marked';
 import Post from './models/Post';
 import Utils from './utils';
 
@@ -12,36 +13,52 @@ export default {
 			* title {String}
 		@returns {Promise}
 	*/
-	add: (payload) {
+	add: (payload) => {
 		try {
-			Utils.validate(payload, 'addOptions');
+			payload = Utils.validate(payload, 'addOptions');
 		} catch (error) {
-			// If validation fails return a rejected promise
+			// If validation fails return a rejected Promise
 			return Promise.reject(error);
 		}
+
 		const post = new Post({
 			body: payload.type === 'html' ? payload.body : Marked(payload.body),
 			title: payload.title,
 			slug: payload.slug || Utils.sluggify(payload.title)
 		});
 
-		return post.save()
-			.then((doc) => {
-				return doc;
-			}, (err) => {
-				return err;
-			});
+		return post.save();
 	},
 
-	remove: (slug) {
+	getOne: (slug) => {
 		if (typeof slug !== 'string') {
 			return Promise.reject(new Error("Argument to Core.remove() must be a String"));
 		}
-		return Post.find({slug}).remove().exex()
-			.then((doc) => {
-				return doc;
-			}, (err) => {
-				return err;
-			});
+		const query = Post.where({slug}).findOne();
+		return query.exec();
+	},
+
+	getPage: (options) => {
+		try {
+			options = Utils.validate(options, 'pageQueryOptions');
+		} catch (error) {
+			// If validation fails, return a rejected Promise
+			return Promise.reject(error);
+		}
+		const {offset, pageSize} = options;
+
+		const query = Post.where({})
+			.sort({created: -1})
+			.skip(pageSize * offset)
+			.limit(pageSize);
+		return query.exec();
+	},
+
+	remove: (slug) => {
+		if (typeof slug !== 'string') {
+			return Promise.reject(new Error("Argument to Core.remove() must be a String"));
+		}
+		const query = Post.where({slug}).findOneAndRemove();
+		return query.exec();
 	}
-}
+};

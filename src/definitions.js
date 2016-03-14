@@ -25,12 +25,21 @@ export default {
 	},
 	initOptions: {
 		app: {
-			required: true,
-			type: 'object'
+			required: true
 		},
 		mongoUri: {
 			default: 'mongodb://localhost/jarndyce',
 			type: 'string'
+		}
+	},
+	pageQueryOptions: {
+		offset: {
+			default: 0,
+			type: 'number'
+		},
+		pageSize: {
+			default: 5,
+			type: 'number'
 		}
 	}
 }

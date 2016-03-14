@@ -7,7 +7,8 @@ const Post = new Mongoose.Schema({
 	},
 	created: {
 		type: Date,
-		default: Date.now()
+		default: Date.now(),
+		index: true
 	},
 	slug: {
 		type: String,
