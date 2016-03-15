@@ -35,12 +35,13 @@ export default {
 		@returns true if validation succeeds
 	*/
 	validate: (payload, name) => {
+		const _payload = Object.assign({}, payload);
 		const definition = Definitions[name];
 		const missing = [];
 		const badType = [];
 
 		Object.keys(definition).forEach((key) => {
-			const type = typeof payload[key];
+			const type = typeof _payload[key];
 			const expectedType = definition[key].type;
 			if (definition[key].required) {
 				if (type === 'undefined') {
@@ -49,13 +50,13 @@ export default {
 					badType.push({key, type, expectedType});
 				}
 			} else if (type === 'undefined') {
-				payload[key] = definition[key].default;
+				_payload[key] = definition[key].default;
 			}
 		});
 
 		if (missing.length > 0 || badType.length > 0) {
 			throw new Error(_formatError(name, missing, badType));
 		}
-		return payload;
+		return _payload;
 	}
 };

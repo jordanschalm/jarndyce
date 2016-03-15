@@ -23,6 +23,7 @@ export default {
 			type: 'string'
 		}
 	},
+
 	initOptions: {
 		app: {
 			required: true
@@ -30,8 +31,13 @@ export default {
 		mongoUri: {
 			default: 'mongodb://localhost/jarndyce',
 			type: 'string'
+		},
+		urlMount: {
+			default: '/jarndyce',
+			type: 'string'
 		}
 	},
+
 	pageQueryOptions: {
 		offset: {
 			default: 0,
@@ -42,4 +48,4 @@ export default {
 			type: 'number'
 		}
 	}
-}
+};
