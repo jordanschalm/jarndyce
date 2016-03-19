@@ -45,7 +45,7 @@ class Jarndyce {
 
 	getOne (slug) {
 		if (typeof slug !== 'string') {
-			return Promise.reject(new Error("Argument to Core.remove() must be a String"));
+			return Promise.reject(new Error("Argument to getOne() must be a String"));
 		}
 		const query = Post.where({slug}).findOne();
 		return query.exec();
@@ -70,7 +70,7 @@ class Jarndyce {
 
 	remove (slug) {
 		if (typeof slug !== 'string') {
-			return Promise.reject(new Error("Argument to Core.remove() must be a String"));
+			return Promise.reject(new Error("Argument to remove() must be a String"));
 		}
 		const query = Post.where({slug}).findOneAndRemove();
 		return query.exec();

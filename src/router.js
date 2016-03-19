@@ -6,17 +6,19 @@ import Utils from './utils';
 const Router = Express.Router();
 const SECRET_KEY = Utils.getSecretKey();
 
+/**
+	@method _validateSignature - middleware to validate
+		AES signature for secure router methods
+	@param {Express.Request} req
+	@param {Express.Response} res
+	@param {Function} next
+**/
 function _validateSignature(req, res, next) {
-	console.log(JSON.stringify(req.body));
-	console.log(SECRET_KEY);
 	const signature = req.get('Signature');
-	console.log(req.get('content-type'));
-	console.log(signature);
 	if (!signature) {
 		res.status('401').send('Validation failed');
 	} else {
 		const decrypted = Crypto.AES.decrypt(signature, SECRET_KEY).toString(Crypto.enc.Utf8);
-		console.log(decrypted);
 
 		if (decrypted !== JSON.stringify(req.body)) {
 			res.status('401').send('Validation failed.');

@@ -29,6 +29,8 @@ export default {
 	},
 
 	/**
+		@method validate - validate payload/options objects
+			for methods defined in definitions.js
 		@param payload {Object}
 		@param name {String}
 		@throws Error if validation fails
